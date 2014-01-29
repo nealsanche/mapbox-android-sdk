@@ -14,6 +14,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
 
@@ -58,6 +59,14 @@ public class PathOverlay extends Overlay {
     // ===========================================================
     // Constructors
     // ===========================================================
+    public PathOverlay() {
+        super();
+        this.mPaint.setColor(Color.BLUE);
+        this.mPaint.setStrokeWidth(10.0f);
+        this.mPaint.setStyle(Paint.Style.STROKE);
+
+        this.clearPath();
+    }
 
     public PathOverlay(final int color, final Context ctx) {
         this(color, 2.0f, new DefaultResourceProxyImpl(ctx));
