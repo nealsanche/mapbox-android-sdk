@@ -34,12 +34,11 @@ public class GeoJSON {
      */
     static ArrayList<Overlay> parse(JSONObject json) throws JSONException {
         ArrayList<Overlay> overlays = new ArrayList<Overlay>();
-        if (json.has("type")) {
-            if (json.get("type").equals("FeatureCollection")) {
-                return featureCollectionToLayers(json);
-            } else if (json.get("type").equals("Feature")) {
-                featureToLayer(json, overlays);
-            }
+        String type = json.optString("type");
+        if (type.equals("FeatureCollection")) {
+            return featureCollectionToLayers(json);
+        } else if (type.equals("Feature")) {
+            featureToLayer(json, overlays);
         }
         return overlays;
     }
@@ -65,12 +64,10 @@ public class GeoJSON {
 
         JSONObject properties = (JSONObject) feature.get("properties");
         String title = "";
-        if (properties.has("title")) {
-            title = properties.getString("title");
-        }
+        title = properties.optString("title");
 
         JSONObject geometry = (JSONObject) feature.get("geometry");
-        String type = geometry.getString("type");
+        String type = geometry.optString("type");
 
         int j;
 
