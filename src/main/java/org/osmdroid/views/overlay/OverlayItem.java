@@ -38,8 +38,6 @@ public class OverlayItem {
     // ===========================================================
 
     protected final String mUid;
-    protected final String mTitle;
-    protected final String mSnippet;
     protected final GeoPoint mGeoPoint;
     protected Drawable mMarker;
     protected HotspotPlace mHotspotPlace;
@@ -47,22 +45,9 @@ public class OverlayItem {
     // ===========================================================
     // Constructors
     // ===========================================================
-
-    /**
-     * @param aTitle    this should be <b>singleLine</b> (no <code>'\n'</code> )
-     * @param aSnippet  a <b>multiLine</b> description ( <code>'\n'</code> possible)
-     * @param aGeoPoint
-     */
-    public OverlayItem(final String aTitle, final String aSnippet, final GeoPoint aGeoPoint) {
-        this(null, aTitle, aSnippet, aGeoPoint);
-    }
-
-    public OverlayItem(final String aUid, final String aTitle, final String aDescription,
-                       final GeoPoint aGeoPoint) {
-        this.mTitle = aTitle;
-        this.mSnippet = aDescription;
+    public OverlayItem(final GeoPoint aGeoPoint) {
         this.mGeoPoint = aGeoPoint;
-        this.mUid = aUid;
+        this.mUid = null;
     }
 
     // ===========================================================
@@ -70,14 +55,6 @@ public class OverlayItem {
     // ===========================================================
     public String getUid() {
         return mUid;
-    }
-
-    public String getTitle() {
-        return mTitle;
-    }
-
-    public String getSnippet() {
-        return mSnippet;
     }
 
     public GeoPoint getPoint() {
@@ -156,9 +133,4 @@ public class OverlayItem {
     public int getHeight() {
         return this.mMarker.getIntrinsicHeight();
     }
-
-    // ===========================================================
-    // Inner and Anonymous Classes
-    // ===========================================================
-
 }

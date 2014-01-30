@@ -4,8 +4,6 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.util.AttributeSet;
@@ -51,11 +49,11 @@ public class MapView
     /**
      * The default marker Overlay, automatically added to the view to add markers directly.
      */
-    private ItemizedIconOverlay<OverlayItem> defaultMarkerOverlay;
+    private ItemizedIconOverlay<Overlay> defaultMarkerOverlay;
     /**
      * List linked to the default marker overlay.
      */
-    private ArrayList<OverlayItem> defaultMarkerList = new ArrayList<OverlayItem>();
+    private ArrayList<Overlay> defaultMarkerList = new ArrayList<Overlay>();
     /**
      * Overlay for basic map touch events.
      */
@@ -217,14 +215,6 @@ public class MapView
     }
 
     /**
-     * Gets a local TileMill address and turns it into a URL for the MapView (not yet implemented).
-     * @return a standard url that will be used by the MapView
-     */
-    private String getURLFromTilemill() {
-        return null;
-    }
-
-    /**
      * Gets a {xyz} image template URL and turns it into a standard URL for the MapView.
      * @param imageTemplateURL the template URL
      * @return a standard url that will be used by the MapView
@@ -234,35 +224,11 @@ public class MapView
     }
 
     /**
-     * Adds a marker to the default marker overlay
-     * @param lat latitude of the marker
-     * @param lon longitude of the marker
-     * @param title title of the marker
-     * @param text body of the marker's tooltip
-     * @return the marker object
-     */
-
-    public Marker addMarker(final double lat, final double lon,
-                            final String title, final String text) {
-        Marker marker = new Marker(this, title, text, new GeoPoint(lat, lon));
-        if (firstMarker) {
-            defaultMarkerList.add(marker);
-            setDefaultItemizedOverlay();
-        } else {
-            defaultMarkerOverlay.addItem(marker);
-        }
-        this.invalidate();
-        firstMarker = false;
-        return null;
-    }
-
-    /**
      * Adds a new ItemizedOverlay to the MapView
      * @param itemizedOverlay the itemized overlay
      */
-    public void addItemizedOverlay(ItemizedOverlay<Marker> itemizedOverlay) {
-        this.getOverlays().add(itemizedOverlay);
-
+    public void addOverlay(Marker overlay) {
+        this.getOverlays().add(overlay);
     }
 
     /**
@@ -323,7 +289,7 @@ public class MapView
      */
     private void setDefaultItemizedOverlay() {
         defaultMarkerOverlay = new ItemizedIconOverlay<OverlayItem>(
-                defaultMarkerList,
+               defaultMarkerList,
                 new ItemizedIconOverlay.OnItemGestureListener<OverlayItem>() {
                     Marker currentMarker;
                     public boolean onItemSingleTapUp(final int index,
