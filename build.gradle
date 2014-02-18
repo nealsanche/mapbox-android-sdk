@@ -1,50 +1,19 @@
-buildscript {
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
 
+buildscript {
     repositories {
         mavenCentral()
     }
-
     dependencies {
-        classpath 'com.android.tools.build:gradle:0.7.+'
+        classpath 'com.android.tools.build:gradle:0.8.+'
     }
-
 }
 
-apply plugin: 'android'
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    compile fileTree(dir: 'libs', include: '*.jar')
-}
-
-android {
-
-    compileSdkVersion 19
-    buildToolsVersion "19.0.0"
-
-    sourceSets {
-
-        main {
-
-            manifest.srcFile 'test/AndroidManifest.xml'
-
-            java.srcDirs = ['test/src', 'src/src', 'src/main/java']
-
-            resources.srcDirs = ['test/res', 'src/res', 'resources']
-
-            res.srcDirs = ['test/res', 'src/res', 'resources']
-
-            assets.srcDirs = ['test/assets']
-
-        }
-
+allprojects {
+    repositories {
+        mavenCentral()
+        mavenLocal()
     }
-    lintOptions {
-          abortOnError false
-	}
 }
 
 task wrapper(type: Wrapper) {
