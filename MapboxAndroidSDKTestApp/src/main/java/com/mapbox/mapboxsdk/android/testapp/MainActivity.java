@@ -47,8 +47,8 @@ public class MainActivity extends ActionBarActivity {
 
         mv.loadFromGeoJSONURL("https://gist.github.com/fdansv/8541618/raw/09da8aef983c8ffeb814d0a1baa8ecf563555b5d/geojsonpointtest");
         setButtonListeners();
-        Marker m = new Marker(mv, "Hello", "World", new LatLng(0f, 0f));
-        m.setIcon(new Icon(Icon.Size.l, "bus", "000"));
+        Marker m = new Marker(mv, "Deutsches Eck", "Confluence of the Moselle and Rhine Rivers.", new LatLng(50.36456, 7.60610));
+        m.setIcon(new Icon(Icon.Size.l, "lighthouse", "000"));
         mv.addMarker(m);
 
         mv.setOnTilesLoadedListener(new TilesLoadedListener() {
