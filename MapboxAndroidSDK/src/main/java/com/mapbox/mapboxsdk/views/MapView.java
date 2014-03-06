@@ -20,22 +20,13 @@ import android.widget.Toast;
 import com.mapbox.mapboxsdk.DefaultResourceProxyImpl;
 import com.mapbox.mapboxsdk.R;
 import com.mapbox.mapboxsdk.format.GeoJSON;
-import com.mapbox.mapboxsdk.overlay.ItemizedIconOverlay;
-import com.mapbox.mapboxsdk.overlay.ItemizedOverlay;
-import com.mapbox.mapboxsdk.overlay.MapEventsOverlay;
-import com.mapbox.mapboxsdk.overlay.MapEventsReceiver;
-import com.mapbox.mapboxsdk.overlay.Marker;
 import com.mapbox.mapboxsdk.ResourceProxy;
 import com.mapbox.mapboxsdk.api.ILatLng;
 import com.mapbox.mapboxsdk.constants.MapboxConstants;
 import com.mapbox.mapboxsdk.events.MapListener;
 import com.mapbox.mapboxsdk.events.ScrollEvent;
 import com.mapbox.mapboxsdk.events.ZoomEvent;
-import com.mapbox.mapboxsdk.overlay.Overlay;
-import com.mapbox.mapboxsdk.overlay.OverlayItem;
-import com.mapbox.mapboxsdk.overlay.OverlayManager;
-import com.mapbox.mapboxsdk.overlay.TilesOverlay;
-import com.mapbox.mapboxsdk.overlay.GeoJSONLayer;
+import com.mapbox.mapboxsdk.overlay.*;
 import com.mapbox.mapboxsdk.tileprovider.MapTileLayerBase;
 import com.mapbox.mapboxsdk.tileprovider.MapTileLayerArray;
 import com.mapbox.mapboxsdk.tileprovider.MapTileLayerBasic;
@@ -293,19 +284,19 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
     /**
      * Sets the default itemized overlay.
      */
-    private void setDefaultItemizedOverlay() {
-        defaultMarkerOverlay = new ItemizedIconOverlay<OverlayItem>(
-                defaultMarkerList,
-                new ItemizedIconOverlay.OnItemGestureListener<OverlayItem>() {
+    private void setDefaultItemizedOverlay()
+    {
+        defaultMarkerOverlay = new ItemizedIconOverlay<OverlayItem>(defaultMarkerList, new ItemizedIconOverlay.OnItemGestureListener<OverlayItem>() {
                     Marker currentMarker;
-                    public boolean onItemSingleTapUp(final int index,
-                                                     final OverlayItem item) {
-                        ((Marker)item).showBubble(new DefaultInfoWindow(R.layout.tootip, MapView.this), MapView.this, true);
 
+                    public boolean onItemSingleTapUp(final int index, final OverlayItem item)
+                    {
+                        ((Marker) item).showBubble(new DefaultInfoWindow(R.layout.tootip, MapView.this), MapView.this, true);
                         return true;
                     }
-                    public boolean onItemLongPress(final int index,
-                                                   final OverlayItem item) {
+
+                    public boolean onItemLongPress(final int index, final OverlayItem item)
+                    {
                         return true;
                     }
                 }, new DefaultResourceProxyImpl(context.getApplicationContext()));
