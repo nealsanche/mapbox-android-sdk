@@ -9,7 +9,6 @@ import com.mapbox.mapboxsdk.views.MapView;
  */
 public class Marker extends ExtendedOverlayItem {
     private Context context;
-    private Tooltip tooltip;
     private MapView mapView;
 
     /**
@@ -47,23 +46,9 @@ public class Marker extends ExtendedOverlayItem {
         return this;
     }
 
-    private void attachTooltip() {
-        tooltip = new Tooltip(context, this, this.getTitle(), this.getDescription());
-        mapView.getOverlays().add(tooltip);
-        mapView.invalidate();
-    }
-
     public Marker setIcon(Icon icon) {
         icon.setMarker(this);
         this.setMarkerHotspot(HotspotPlace.CENTER);
         return this;
-    }
-
-    public void setTooltipVisible() {
-        tooltip.setVisible(true);
-    }
-
-    public void setTooltipInvisible() {
-        tooltip.setVisible(false);
     }
 }

@@ -14,63 +14,76 @@ import java.net.URL;
  * An Icon provided by the Mapbox marker API, optionally
  * with a symbol from Maki
  */
-public class Icon {
-
+public class Icon
+{
     private Marker marker;
     private BitmapDrawable drawable;
-
     static String BASE_URL = "http://api.tiles.mapbox.com/v3/";
 
-    public enum Size {
+    public enum Size
+    {
         l, m, s
     }
 
     /**
      * Initialize an icon with size, symbol, and color, and start a
      * download process to load it from the API.
-     * @param size
-     * @param symbol
-     * @param color
+     *
+     * @param size Marker Size
+     * @param symbol Maki symbol
+     * @param color Color of marker (hexadecimal)
      */
-    public Icon(Size size, String symbol, String color) {
+    public Icon(Size size, String symbol, String color)
+    {
         String url = BASE_URL + "marker/pin-" + size.toString();
-        if(!symbol.equals("")){
-            url+= "-" + symbol + "+" + color + ".png";
+        if (!symbol.equals(""))
+        {
+            url += "-" + symbol + "+" + color + ".png";
         }
-        else{
-            url+= "+" + color + ".png";
+        else
+        {
+            url += "+" + color + ".png";
         }
         new BitmapLoader().execute(url);
     }
 
-    public Icon setMarker(Marker marker) {
+    public Icon setMarker(Marker marker)
+    {
         this.marker = marker;
-        if (drawable != null) {
+        if (drawable != null)
+        {
             this.marker.setMarker(drawable);
         }
         return this;
     }
 
-    class BitmapLoader extends AsyncTask<String, Void,Bitmap> {
-
+    class BitmapLoader extends AsyncTask<String, Void, Bitmap>
+    {
         @Override
-        protected Bitmap doInBackground(String... src) {
-            try {
+        protected Bitmap doInBackground(String... src)
+        {
+            try
+            {
                 URL url = new URL(src[0]);
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setDoInput(true);
                 connection.connect();
                 return BitmapFactory.decodeStream(connection.getInputStream());
-            } catch (IOException e) {
-                e.printStackTrace();
+            }
+            catch (IOException e)
+            {
+                Log.e(TAG, "Exception loading bitmap: " + e.toString());
                 return null;
             }
         }
+
         @Override
-        protected void onPostExecute(Bitmap bitmap) {
+        protected void onPostExecute(Bitmap bitmap)
+        {
             drawable = new BitmapDrawable(bitmap);
             Log.w(TAG, "icon loaded");
-            if (marker != null) {
+            if (marker != null)
+            {
                 marker.setMarker(drawable);
             }
         }
