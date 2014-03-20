@@ -2,6 +2,7 @@ package com.mapbox.mapboxsdk.tileprovider.modules;
 
 import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.DisplayMetrics;
 import com.mapbox.mapboxsdk.tileprovider.MapTile;
@@ -17,15 +18,26 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.File;
+import java.security.GeneralSecurityException;
 import java.util.UUID;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import com.mapbox.mapboxsdk.views.MapView;
 import com.mapbox.mapboxsdk.tileprovider.tilesource.TileLayer;
 import com.mapbox.mapboxsdk.tileprovider.util.StreamUtils;
+import com.mapbox.mapboxsdk.views.MapView;
+import com.mapbox.mapboxsdk.views.util.TilesLoadedListener;
+import com.squareup.okhttp.HttpResponseCache;
+import com.squareup.okhttp.OkHttpClient;
 
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+
+import javax.net.ssl.SSLContext;
 
 /**
  * The {@link MapTileDownloader} loads tiles from an HTTP server.
@@ -85,13 +97,13 @@ public class MapTileDownloader extends MapTileModuleLayerBase {
     }
 
     @Override
-    public int getMinimumZoomLevel() {
+    public float getMinimumZoomLevel() {
         TileLayer tileLayer = mTileSource.get();
         return (tileLayer != null ? tileLayer.getMinimumZoomLevel() : MINIMUM_ZOOMLEVEL);
     }
 
     @Override
-    public int getMaximumZoomLevel() {
+    public float getMaximumZoomLevel() {
         TileLayer tileLayer = mTileSource.get();
         return (tileLayer != null ? tileLayer.getMaximumZoomLevel() : MAXIMUM_ZOOMLEVEL);
     }
@@ -122,7 +134,17 @@ public class MapTileDownloader extends MapTileModuleLayerBase {
             InputStream in = null;
             OutputStream out = null;
             final MapTile tile = aState.getMapTile();
+
             OkHttpClient client = new OkHttpClient();
+            SSLContext sslContext;
+            try {
+                sslContext = SSLContext.getInstance("TLS");
+                sslContext.init(null, null, null);
+            } catch (GeneralSecurityException e) {
+                throw new AssertionError(); // The system has no TLS. Just give up.
+            }
+            client.setSslSocketFactory(sslContext.getSocketFactory());
+
             if (cache != null) {
                 client.setResponseCache(cache);
             }

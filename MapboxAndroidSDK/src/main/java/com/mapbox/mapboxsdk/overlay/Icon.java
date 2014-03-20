@@ -8,6 +8,7 @@ import android.os.AsyncTask;
 import android.util.Log;
 import com.mapbox.mapboxsdk.constants.MapboxConstants;
 import com.mapbox.mapboxsdk.util.BitmapUtils;
+
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -16,8 +17,7 @@ import java.net.URL;
  * An Icon provided by the Mapbox marker API, optionally
  * with a symbol from Maki
  */
-public class Icon implements MapboxConstants
-{
+public class Icon implements MapboxConstants {
     private Marker marker;
     private BitmapDrawable drawable;
     private Resources mResources;
@@ -27,13 +27,11 @@ public class Icon implements MapboxConstants
 
         private String apiString;
 
-        Size(String api)
-        {
+        Size(String api) {
             this.apiString = api;
         }
 
-        public String getApiString()
-        {
+        public String getApiString() {
             return apiString;
         }
     }
@@ -41,19 +39,19 @@ public class Icon implements MapboxConstants
     /**
      * Initialize an icon with size, symbol, and color, and start a
      * download process to load it from the API.
+     *
      * @param resources Android Resources - Used for proper Bitmap Density generation
-     * @param size Size of Icon
-     * @param symbol Maki Symbol
-     * @param color Color of Icon
+     * @param size      Size of Icon
+     * @param symbol    Maki Symbol
+     * @param color     Color of Icon
      */
     public Icon(Resources resources, Size size, String symbol, String color) {
         this.mResources = resources;
         String url = MAPBOX_BASE_URL + "marker/pin-" + size.getApiString();
-        if(!symbol.equals("")){
-            url+= "-" + symbol + "+" + color + ".png";
-        }
-        else{
-            url+= "+" + color + ".png";
+        if (!symbol.equals("")) {
+            url += "-" + symbol + "+" + color + ".png";
+        } else {
+            url += "+" + color + ".png";
         }
         Log.d(TAG, "Maki url to load = '" + url + "'");
         new BitmapLoader().execute(url);
@@ -83,12 +81,13 @@ public class Icon implements MapboxConstants
                 return null;
             }
         }
+
         @Override
         protected void onPostExecute(Bitmap bitmap) {
             drawable = new BitmapDrawable(mResources, bitmap);
-            Log.d(TAG, "icon loaded");
             if (marker != null) {
                 marker.setMarker(drawable);
+                Log.w(TAG, "icon loaded");
             }
         }
     }
