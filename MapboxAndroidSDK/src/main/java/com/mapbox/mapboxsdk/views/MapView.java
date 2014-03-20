@@ -1367,4 +1367,12 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
     public String toString() {
         return "MapView {" + getTileProvider() + "}";
     }
+
+    public void setMapListener(MapListener listener) {
+        mListener = listener;
+    }
+
+    public MapListener getMapListener() {
+        return mListener;
+    }
 }
