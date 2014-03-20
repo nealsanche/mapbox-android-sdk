@@ -3,6 +3,7 @@ package com.mapbox.mapboxsdk.views;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.*;
+import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Handler;
 import android.util.AttributeSet;
@@ -21,10 +22,13 @@ import com.mapbox.mapboxsdk.geometry.BoundingBox;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.overlay.*;
 import com.mapbox.mapboxsdk.tile.TileSystem;
+import com.mapbox.mapboxsdk.tileprovider.MapTile;
 import com.mapbox.mapboxsdk.tileprovider.MapTileLayerBase;
 import com.mapbox.mapboxsdk.tileprovider.MapTileLayerBasic;
 import com.mapbox.mapboxsdk.tileprovider.tilesource.ITileLayer;
 import com.mapbox.mapboxsdk.tileprovider.tilesource.MapboxTileLayer;
+import com.mapbox.mapboxsdk.tileprovider.tilesource.TileLayer;
+import com.mapbox.mapboxsdk.tileprovider.util.LowMemoryException;
 import com.mapbox.mapboxsdk.tileprovider.util.SimpleInvalidationHandler;
 import com.mapbox.mapboxsdk.util.GeometryMath;
 import com.mapbox.mapboxsdk.util.NetworkUtils;
@@ -34,6 +38,8 @@ import com.mapbox.mapboxsdk.views.util.TilesLoadedListener;
 import com.mapbox.mapboxsdk.views.util.constants.MapViewConstants;
 import com.mapbox.mapboxsdk.views.util.constants.MapViewLayouts;
 import org.json.JSONException;
+
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -136,8 +142,13 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
         TileSystem.setTileSize(tileSizePixels);
 
         if (tileProvider == null) {
-            final ITileLayer tileSource = new MapboxTileLayer("examples.map-zgrqqx0w");
-            tileProvider = new MapTileLayerBasic(context, tileSource, this);
+            if (isInEditMode()) {
+                tileProvider = createEditModeTileProvider();
+            }
+            else {
+                final ITileLayer tileSource = new MapboxTileLayer("examples.map-zgrqqx0w");
+                tileProvider = new MapTileLayerBasic(context, tileSource, this);
+            }
         }
 
         mTileRequestCompleteHandler = tileRequestCompleteHandler == null
@@ -169,6 +180,63 @@ public class MapView extends ViewGroup implements MapViewConstants, MapEventsRec
         {
 			Log.w(MapView.class.getCanonicalName(), "mapid not set.");
         }
+    }
+
+    private MapTileLayerBase createEditModeTileProvider() {
+
+        // Just provide an empty implementation of a map tile layer.
+
+        return new MapTileLayerBase(new ITileLayer() {
+            @Override
+            public Drawable getDrawable(InputStream aTileInputStream) throws LowMemoryException {
+                return null;
+            }
+
+            @Override
+            public TileLayer setURL(String aUrl) {
+                return null;
+            }
+
+            @Override
+            public String getTileURL(MapTile aTile, boolean hdpi) {
+                return null;
+            }
+
+            @Override
+            public float getMinimumZoomLevel() {
+                return 0;
+            }
+
+            @Override
+            public float getMaximumZoomLevel() {
+                return 0;
+            }
+
+            @Override
+            public int getTileSizePixels() {
+                return 0;
+            }
+        }) {
+            @Override
+            public Drawable getMapTile(MapTile pTile) {
+                return null;
+            }
+
+            @Override
+            public void detach() {
+
+            }
+
+            @Override
+            public float getMinimumZoomLevel() {
+                return 0;
+            }
+
+            @Override
+            public float getMaximumZoomLevel() {
+                return 0;
+            }
+        };
     }
 
     public MapView(final Context context, AttributeSet attrs){
