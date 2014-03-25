@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
+import com.mapbox.mapboxsdk.geometry.BoundingBox;
+import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.tileprovider.modules.MapTileModuleLayerBase;
 import com.mapbox.mapboxsdk.tileprovider.tilesource.ITileLayer;
 import android.util.Log;
@@ -39,7 +41,7 @@ public class MapTileLayerArray extends MapTileLayerBase {
      */
     protected MapTileLayerArray(final ITileLayer pTileSource,
                                 final IRegisterReceiver pRegisterReceiver) {
-        this(pTileSource, pRegisterReceiver, new MapTileModuleLayerBase[0]);
+        this(pTileSource, pRegisterReceiver, null);
     }
 
     /**
@@ -56,11 +58,16 @@ public class MapTileLayerArray extends MapTileLayerBase {
         mWorking = new HashMap<MapTile, MapTileRequestState>();
 
         mTileProviderList = new ArrayList<MapTileModuleLayerBase>();
-        Collections.addAll(mTileProviderList, pTileProviderArray);
+        if (pTileProviderArray != null) {
+            Collections.addAll(mTileProviderList, pTileProviderArray);
+        }
     }
 
     @Override
     public void detach() {
+        if (getTileSource() != null) {
+            getTileSource().detach();
+        }
         synchronized (mTileProviderList) {
             for (final MapTileModuleLayerBase tileProvider : mTileProviderList) {
                 tileProvider.detach();
@@ -193,12 +200,10 @@ public class MapTileLayerArray extends MapTileLayerBase {
 
     @Override
     public float getMinimumZoomLevel() {
-    	float result = MAXIMUM_ZOOMLEVEL;
+    	float result = MINIMUM_ZOOMLEVEL;
         synchronized (mTileProviderList) {
             for (final MapTileModuleLayerBase tileProvider : mTileProviderList) {
-                if (tileProvider.getMinimumZoomLevel() < result) {
-                    result = tileProvider.getMinimumZoomLevel();
-                }
+                result = Math.max(result, tileProvider.getMinimumZoomLevel());
             }
         }
         return result;
@@ -206,12 +211,10 @@ public class MapTileLayerArray extends MapTileLayerBase {
 
     @Override
     public float getMaximumZoomLevel() {
-    	float result = MINIMUM_ZOOMLEVEL;
+    	float result = MAXIMUM_ZOOMLEVEL;
         synchronized (mTileProviderList) {
             for (final MapTileModuleLayerBase tileProvider : mTileProviderList) {
-                if (tileProvider.getMaximumZoomLevel() > result) {
-                    result = tileProvider.getMaximumZoomLevel();
-                }
+                result = Math.min(result, tileProvider.getMaximumZoomLevel());
             }
         }
         return result;
@@ -219,14 +222,74 @@ public class MapTileLayerArray extends MapTileLayerBase {
 
     @Override
     public void setTileSource(final ITileLayer aTileSource) {
+
         super.setTileSource(aTileSource);
 
         synchronized (mTileProviderList) {
-            for (final MapTileModuleLayerBase tileProvider : mTileProviderList) {
-                tileProvider.setTileSource(aTileSource);
+        	if (mTileProviderList.size() != 0) {
+        		mTileProviderList.get(0).setTileSource(aTileSource);
                 clearTileCache();
+        	}
+            
+        }
+    }
+
+    @Override
+    public BoundingBox getBoundingBox() {
+        BoundingBox result = null;
+        synchronized (mTileProviderList) {
+            for (final MapTileModuleLayerBase tileProvider : mTileProviderList) {
+                BoundingBox providerBox = tileProvider.getBoundingBox();
+                if (result == null) {
+                    result = providerBox;
+                } else {
+                    result = result.union(providerBox);
+                }
             }
         }
+        return result;
+    }
+
+    @Override
+    public LatLng getCenterCoordinate() {
+        float latitude = 0;
+        float longitude = 0;
+        int nb = 0;
+        synchronized (mTileProviderList) {
+            for (final MapTileModuleLayerBase tileProvider : mTileProviderList) {
+                LatLng providerCenter = tileProvider.getCenterCoordinate();
+                if (providerCenter != null) {
+                    latitude += providerCenter.getLatitude();
+                    longitude += providerCenter.getLongitude();
+                    nb ++;
+                }
+            }
+        }
+        if (nb > 0 ) {
+            latitude /= nb;
+            longitude /= nb;
+            return new LatLng(latitude, longitude);
+        }
+
+        return null;
+    }
+
+
+    @Override
+    public float getCenterZoom() {
+        float centerZoom = 0;
+        int nb = 0;
+        synchronized (mTileProviderList) {
+            for (final MapTileModuleLayerBase tileProvider : mTileProviderList) {
+                centerZoom += tileProvider.getCenterZoom();
+                nb ++;
+            }
+        }
+        if (centerZoom > 0 ) {
+            return centerZoom / nb;
+        }
+
+        return (getMaximumZoomLevel() + getMinimumZoomLevel()) / 2;
     }
 
     private static final String TAG = "MapTileLayerArray";

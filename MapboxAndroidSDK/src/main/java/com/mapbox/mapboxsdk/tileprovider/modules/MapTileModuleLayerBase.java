@@ -1,6 +1,9 @@
 package com.mapbox.mapboxsdk.tileprovider.modules;
 
 import android.graphics.drawable.Drawable;
+
+import com.mapbox.mapboxsdk.geometry.BoundingBox;
+import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.tileprovider.ExpirableBitmapDrawable;
 import com.mapbox.mapboxsdk.tileprovider.MapTile;
 import com.mapbox.mapboxsdk.tileprovider.MapTileRequestState;
@@ -70,13 +73,43 @@ public abstract class MapTileModuleLayerBase implements TileLayerConstants {
      */
     public abstract float getMaximumZoomLevel();
 
+
+    /**
+     * Get the tile size in pixels this tile provider provides.
+     *
+     * @return the tile size in pixels
+     */
+    public abstract int getTileSizePixels();
+
+    /**
+     * Get the tile provider bounding box.
+     *
+     * @return the tile source bounding box
+     */
+    public abstract BoundingBox getBoundingBox();
+
+    /**
+     * Get the tile provider center.
+     *
+     * @return the tile source center
+     */
+    public abstract LatLng getCenterCoordinate();
+
+    /**
+     * Get the tile provider suggested starting zoom.
+     *
+     * @return the tile suggested starting zoom
+     */
+    public abstract float getCenterZoom();
+
     /**
      * Sets the tile source for this tile provider.
      *
      * @param tileSource the tile source
      */
     public abstract void setTileSource(ITileLayer tileSource);
-
+    public abstract ITileLayer getTileSource();
+    
     private final ExecutorService mExecutor;
 
     protected final Object mQueueLockObject = new Object();
