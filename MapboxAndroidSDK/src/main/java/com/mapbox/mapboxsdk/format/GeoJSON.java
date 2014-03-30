@@ -1,12 +1,15 @@
 package com.mapbox.mapboxsdk.format;
 
 import android.graphics.Paint;
+
 import com.mapbox.mapboxsdk.geometry.LatLng;
+import com.mapbox.mapboxsdk.overlay.Marker;
+import com.mapbox.mapboxsdk.overlay.PathOverlay;
 import com.mapbox.mapboxsdk.views.MapView;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import com.mapbox.mapboxsdk.overlay.*;
 
 /**
  * A GeoJSON parser.
@@ -27,7 +30,7 @@ public class GeoJSON {
      * Parse a GeoJSON object into an array of overlays.
      *
      * @param json GeoJSON
-     * @param mv a mapview for the overlays to be added to
+     * @param mv   a mapview for the overlays to be added to
      * @throws JSONException
      */
     public static void parse(JSONObject json, MapView mv) throws JSONException {
@@ -60,21 +63,20 @@ public class GeoJSON {
 
         JSONObject geometry = (JSONObject) feature.get("geometry");
         String type = geometry.optString("type");
-
         int j;
 
         if (type.equals("Point")) {
             JSONArray coordinates = (JSONArray) geometry.get("coordinates");
             double lon = (Double) coordinates.get(0);
             double lat = (Double) coordinates.get(1);
-            mv.addMarker(new Marker(title, "", new LatLng(lat, lon)));
+            mv.addMarker(new Marker(mv, title, "", new LatLng(lat, lon)));
         } else if (type.equals("MultiPoint")) {
             JSONArray points = (JSONArray) geometry.get("coordinates");
             for (j = 0; j < points.length(); j++) {
                 JSONArray coordinates = (JSONArray) points.get(j);
                 double lon = (Double) coordinates.get(0);
                 double lat = (Double) coordinates.get(1);
-                mv.addMarker(new Marker(title, "", new LatLng(lat, lon)));
+                mv.addMarker(new Marker(mv, title, "", new LatLng(lat, lon)));
             }
         } else if (type.equals("LineString")) {
             PathOverlay path = new PathOverlay();

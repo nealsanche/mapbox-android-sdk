@@ -1,5 +1,5 @@
 test/bin/
-
+MapboxAndroidSDK/src/main/gen/
 test/classes/
 src/out/
 test/gen/
@@ -14,6 +14,7 @@ test/assets/
 
 local.properties
 *.iml
-gradlew
 
+gen
 
+bin

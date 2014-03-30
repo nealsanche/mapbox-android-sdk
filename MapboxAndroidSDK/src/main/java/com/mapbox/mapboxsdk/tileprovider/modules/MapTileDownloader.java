@@ -1,31 +1,21 @@
 package com.mapbox.mapboxsdk.tileprovider.modules;
 
 import android.graphics.drawable.Drawable;
-import android.text.TextUtils;
-import android.util.Log;
 import android.util.DisplayMetrics;
-import com.mapbox.mapboxsdk.tileprovider.MapTile;
+
+import com.mapbox.mapboxsdk.geometry.BoundingBox;
+import com.mapbox.mapboxsdk.geometry.LatLng;
+import com.mapbox.mapboxsdk.tileprovider.MapTileCache;
 import com.mapbox.mapboxsdk.tileprovider.MapTileRequestState;
 import com.mapbox.mapboxsdk.tileprovider.tilesource.ITileLayer;
-import com.mapbox.mapboxsdk.views.util.TilesLoadedListener;
-import com.squareup.okhttp.OkHttpClient;
-import com.squareup.okhttp.HttpResponseCache;
-import java.net.URL;
-
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.File;
-import java.util.UUID;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import com.mapbox.mapboxsdk.views.MapView;
 import com.mapbox.mapboxsdk.tileprovider.tilesource.TileLayer;
-import com.mapbox.mapboxsdk.tileprovider.util.StreamUtils;
+import com.mapbox.mapboxsdk.views.MapView;
+import com.mapbox.mapboxsdk.views.util.TileLoadedListener;
+import com.mapbox.mapboxsdk.views.util.TilesLoadedListener;
 
-import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+
+import uk.co.senab.bitmapcache.CacheableBitmapDrawable;
 
 /**
  * The {@link MapTileDownloader} loads tiles from an HTTP server.
@@ -34,34 +24,45 @@ public class MapTileDownloader extends MapTileModuleLayerBase {
     private static final String TAG = "Tile downloader";
 
     private final AtomicReference<TileLayer> mTileSource = new AtomicReference<TileLayer>();
+    private final AtomicReference<MapTileCache> mTileCache = new AtomicReference<MapTileCache>();
 
-    private final INetworkAvailabilityCheck mNetworkAvailablityCheck;
+    private final NetworkAvailabilityCheck mNetworkAvailabilityCheck;
     private MapView mapView;
-    HttpResponseCache cache;
     boolean hdpi;
 
-    ArrayList<Boolean> threadControl = new ArrayList<Boolean>();
 
     public MapTileDownloader(final ITileLayer pTileSource,
-                             final INetworkAvailabilityCheck pNetworkAvailablityCheck,
+                             final MapTileCache pTileCache,
+                             final NetworkAvailabilityCheck pNetworkAvailabilityCheck,
                              final MapView mapView) {
         super(NUMBER_OF_TILE_DOWNLOAD_THREADS, TILE_DOWNLOAD_MAXIMUM_QUEUE_SIZE);
         this.mapView = mapView;
+        this.mTileCache.set(pTileCache);
 
         hdpi = mapView.getContext().getResources().getDisplayMetrics().densityDpi > DisplayMetrics.DENSITY_HIGH;
 
-        mNetworkAvailablityCheck = pNetworkAvailablityCheck;
+        mNetworkAvailabilityCheck = pNetworkAvailabilityCheck;
         setTileSource(pTileSource);
-        File cacheDir = new File(System.getProperty("java.io.tmpdir"), UUID.randomUUID().toString());
-        try {
-            cache = new HttpResponseCache(cacheDir, 1024);
-        } catch(Exception e) {
-
-        }
     }
 
     public ITileLayer getTileSource() {
         return mTileSource.get();
+    }
+
+    public MapTileCache getCache() {
+        return mTileCache.get();
+    }
+
+    public boolean isNetworkAvailable() {
+        return (mNetworkAvailabilityCheck == null || mNetworkAvailabilityCheck.getNetworkAvailable());
+    }
+
+    public TilesLoadedListener getTilesLoadedListener() {
+        return mapView.getTilesLoadedListener();
+    }
+
+    public TileLoadedListener getTileLoadedListener() {
+        return mapView.getTileLoadedListener();
     }
 
     @Override
@@ -85,19 +86,40 @@ public class MapTileDownloader extends MapTileModuleLayerBase {
     }
 
     @Override
-    public int getMinimumZoomLevel() {
+    public float getMinimumZoomLevel() {
         TileLayer tileLayer = mTileSource.get();
         return (tileLayer != null ? tileLayer.getMinimumZoomLevel() : MINIMUM_ZOOMLEVEL);
     }
 
     @Override
-    public int getMaximumZoomLevel() {
+    public float getMaximumZoomLevel() {
         TileLayer tileLayer = mTileSource.get();
         return (tileLayer != null ? tileLayer.getMaximumZoomLevel() : MAXIMUM_ZOOMLEVEL);
     }
 
     @Override
+    public BoundingBox getBoundingBox() {
+        TileLayer tileLayer = mTileSource.get();
+        return (tileLayer != null ? tileLayer.getBoundingBox() : null);
+    }
+
+    @Override
+    public LatLng getCenterCoordinate() {
+        TileLayer tileLayer = mTileSource.get();
+        return (tileLayer != null ? tileLayer.getCenterCoordinate() : null);
+    }
+
+    @Override
+    public float getCenterZoom() {
+        TileLayer tileLayer = mTileSource.get();
+        return (tileLayer != null ? tileLayer.getCenterZoom() : (getMaximumZoomLevel() + getMinimumZoomLevel()) / 2);
+    }
+
+    @Override
     public void setTileSource(final ITileLayer tileSource) {
+        if (mTileSource.get() != null) {
+            mTileSource.get().detach();
+        }
         // We are only interested in TileLayer tile sources
         if (tileSource instanceof TileLayer) {
             mTileSource.set((TileLayer) tileSource);
@@ -111,91 +133,18 @@ public class MapTileDownloader extends MapTileModuleLayerBase {
 
         @Override
         public Drawable loadTile(final MapTileRequestState aState) throws CantContinueException {
-            threadControl.add(false);
-            int threadIndex = threadControl.size() - 1;
+
             TileLayer tileLayer = mTileSource.get();
 
             if (tileLayer == null) {
                 return null;
+            } else {
+                return tileLayer.getDrawableFromTile(MapTileDownloader.this, aState.getMapTile(), hdpi);
             }
-
-            InputStream in = null;
-            OutputStream out = null;
-            final MapTile tile = aState.getMapTile();
-            OkHttpClient client = new OkHttpClient();
-            if (cache != null) {
-                client.setResponseCache(cache);
-            }
-            if (mNetworkAvailablityCheck != null
-                    && !mNetworkAvailablityCheck.getNetworkAvailable()) {
-                Log.d(TAG, "Skipping " + getName() + " due to NetworkAvailabilityCheck.");
-                return null;
-            }
-
-            String url = tileLayer.getTileURL(tile, hdpi);
-
-            if (TextUtils.isEmpty(url)) {
-                return null;
-            }
-
-            try {
-                // Log.d(TAG, "getting tile " + tile.getX() + ", " + tile.getY());
-                // Log.d(TAG, "Downloading MapTile from url: " + url);
-
-                HttpURLConnection connection = client.open(new URL(url));
-                in = connection.getInputStream();
-
-                if (in == null) {
-                    Log.d(TAG, "No content downloading MapTile: " + tile);
-                    return null;
-                }
-
-                final ByteArrayOutputStream dataStream = new ByteArrayOutputStream();
-                out = new BufferedOutputStream(dataStream, StreamUtils.IO_BUFFER_SIZE);
-                StreamUtils.copy(in, out);
-                out.flush();
-                final byte[] data = dataStream.toByteArray();
-                final ByteArrayInputStream byteStream = new ByteArrayInputStream(data);
-
-                Drawable result = tileLayer.getDrawable(byteStream);
-                threadControl.set(threadIndex, true);
-                if (checkThreadControl()) {
-                    TilesLoadedListener listener = mapView.getTilesLoadedListener();
-                    if (listener != null) {
-                        listener.onTilesLoaded();
-                    }
-                }
-                result = mapView.getTileLoadedListener() != null ? onTileLoaded(result) : result;
-                return result;
-            } catch (final Throwable e) {
-                Log.d(TAG, "Error downloading MapTile: " + tile + ":" + e);
-            } finally {
-                StreamUtils.closeStream(in);
-                StreamUtils.closeStream(out);
-            }
-
-            return null;
-        }
-
-        @Override
-        protected void tileLoaded(final MapTileRequestState pState, Drawable pDrawable) {
-            removeTileFromQueues(pState.getMapTile());
-            pState.getCallback().mapTileRequestCompleted(pState, pDrawable);
         }
     }
 
-    private Drawable onTileLoaded(Drawable pDrawable) {
-        Log.i(TAG, "tile loaded on downloader");
+    private CacheableBitmapDrawable onTileLoaded(CacheableBitmapDrawable pDrawable) {
         return mapView.getTileLoadedListener().onTileLoaded(pDrawable);
-    }
-
-    private boolean checkThreadControl() {
-        for (boolean done: threadControl) {
-            if (!done) {
-                return false;
-            }
-        }
-        threadControl = new ArrayList<Boolean>();
-        return true;
     }
 }

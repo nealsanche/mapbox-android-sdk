@@ -2,7 +2,9 @@ package com.mapbox.mapboxsdk.views;
 
 import android.view.GestureDetector;
 import android.view.MotionEvent;
-import com.mapbox.mapboxsdk.tile.TileSystem;
+
+import com.mapbox.mapboxsdk.api.ILatLng;
+import com.mapbox.mapboxsdk.util.constants.UtilConstants;
 
 /**
  * A custom gesture detector that processes gesture events and dispatches them
@@ -14,6 +16,7 @@ public class MapViewGestureDetectorListener implements GestureDetector.OnGesture
 
     /**
      * Bind a new gesture detector to a map
+     *
      * @param mv a map view
      */
     public MapViewGestureDetectorListener(final MapView mv) {
@@ -41,12 +44,12 @@ public class MapViewGestureDetectorListener implements GestureDetector.OnGesture
                            final MotionEvent e2,
                            final float velocityX,
                            final float velocityY) {
-        if (this.mapView.getOverlayManager()
+        if (this.mapView.isAnimating() || this.mapView.getOverlayManager()
                 .onFling(e1, e2, velocityX, velocityY, this.mapView)) {
             return true;
         }
 
-        final int worldSize = TileSystem.MapSize(this.mapView.getZoomLevel(false));
+        final int worldSize = this.mapView.getProjection().mapSize(this.mapView.getZoomLevel(false));
         this.mapView.mIsFlinging = true;
         this.mapView.mScroller.fling(
                 this.mapView.getScrollX(),
@@ -62,16 +65,20 @@ public class MapViewGestureDetectorListener implements GestureDetector.OnGesture
 
     @Override
     public void onLongPress(final MotionEvent e) {
+        if (UtilConstants.DEBUGMODE) {
+            final ILatLng center = this.mapView.getProjection().fromPixels(e.getX(), e.getY());
+            this.mapView.zoomOutFixing(center);
+        }
     }
 
     @Override
     public boolean onScroll(final MotionEvent e1, final MotionEvent e2, final float distanceX,
                             final float distanceY) {
-        if (this.mapView.getOverlayManager().onScroll(e1, e2, distanceX, distanceY,
+        if (this.mapView.isAnimating() || this.mapView.getOverlayManager().onScroll(e1, e2, distanceX, distanceY,
                 this.mapView)) {
             return true;
         }
-        this.mapView.scrollBy((int) distanceX, (int) distanceY);
+        this.mapView.getController().panBy((int) distanceX, (int) distanceY);
         return true;
     }
 

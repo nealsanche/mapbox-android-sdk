@@ -1,52 +1,47 @@
 package com.mapbox.mapboxsdk.overlay;
 
-import java.util.List;
-
-import com.mapbox.mapboxsdk.DefaultResourceProxyImpl;
-import com.mapbox.mapboxsdk.ResourceProxy;
-import com.mapbox.mapboxsdk.ResourceProxy.bitmap;
-import com.mapbox.mapboxsdk.views.MapView;
 import android.content.Context;
 import android.graphics.Point;
+import android.graphics.PointF;
 import android.graphics.drawable.Drawable;
+import android.view.Display;
+import com.mapbox.mapboxsdk.R;
 import android.view.MotionEvent;
+import android.view.WindowManager;
+import com.mapbox.mapboxsdk.geometry.BoundingBox;
+import com.mapbox.mapboxsdk.geometry.LatLng;
+import com.mapbox.mapboxsdk.views.MapView;
+import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas;
 import com.mapbox.mapboxsdk.views.util.Projection;
 
-public class ItemizedIconOverlay<Item extends OverlayItem> extends ItemizedOverlay<Item> {
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
+public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<Item> {
 
     protected final List<Item> mItemList;
     protected OnItemGestureListener<Item> mOnItemGestureListener;
     private int mDrawnItemsLimit = Integer.MAX_VALUE;
     private final Point mTouchScreenPoint = new Point();
-    private final Point mItemPoint = new Point();
-
-    public ItemizedIconOverlay(
-            final List<Item> pList,
-            final Drawable pDefaultMarker,
-            final com.mapbox.mapboxsdk.overlay.ItemizedIconOverlay.OnItemGestureListener<Item> pOnItemGestureListener,
-            final ResourceProxy pResourceProxy)
-    {
-        super(pDefaultMarker, pResourceProxy);
-
-        this.mItemList = pList;
-        this.mOnItemGestureListener = pOnItemGestureListener;
-        populate();
-    }
-
-    public ItemizedIconOverlay(
-            final List<Item> pList,
-            final com.mapbox.mapboxsdk.overlay.ItemizedIconOverlay.OnItemGestureListener<Item> pOnItemGestureListener,
-            final ResourceProxy pResourceProxy)
-    {
-        this(pList, pResourceProxy.getDrawable(bitmap.marker_default), pOnItemGestureListener, pResourceProxy);
-    }
+    private final PointF mItemPoint = new PointF();
+    private ItemizedIconOverlay<ClusterItem> clusters;
+    private MapView view;
+    private Context context;
+    private boolean isClusterOverlay;
+    private ClusterActions clusterActions;
+    private boolean clusteringOn = true;
 
     public ItemizedIconOverlay(
             final Context pContext,
             final List<Item> pList,
-            final com.mapbox.mapboxsdk.overlay.ItemizedIconOverlay.OnItemGestureListener<Item> pOnItemGestureListener)
-    {
-        this(pList, new DefaultResourceProxyImpl(pContext).getDrawable(bitmap.marker_default), pOnItemGestureListener, new DefaultResourceProxyImpl(pContext));
+            final com.mapbox.mapboxsdk.overlay.ItemizedIconOverlay.OnItemGestureListener<Item> pOnItemGestureListener) {
+        super(pContext.getResources().getDrawable(R.drawable.marker_default));
+
+        this.context = pContext;
+        this.mItemList = pList;
+        this.mOnItemGestureListener = pOnItemGestureListener;
+        populate();
     }
 
     @Override
@@ -171,16 +166,193 @@ public class ItemizedIconOverlay<Item extends OverlayItem> extends ItemizedOverl
             final Drawable marker = (item.getMarker(0) == null) ? this.mDefaultMarker : item
                     .getMarker(0);
 
-            pj.toPixels(item.getPoint(), mItemPoint);
+            pj.toMapPixels(item.getPoint(), mItemPoint);
 
-            if (hitTest(item, marker, mTouchScreenPoint.x - mItemPoint.x, mTouchScreenPoint.y
-                    - mItemPoint.y)) {
+            if (hitTest(item, marker, (int) (mTouchScreenPoint.x - mItemPoint.x), (int) (mTouchScreenPoint.y
+                    - mItemPoint.y))) {
                 if (task.run(i)) {
                     return true;
                 }
             }
         }
         return false;
+    }
+
+    public void setClusterActions(ClusterActions clusterActions) {
+        this.clusterActions = clusterActions;
+    }
+
+    public void cluster(MapView view, Context context) {
+        if (!isClusteringOn()) {
+            return;
+        }
+        this.view = view;
+        this.context = context;
+        int currentGroup = 0;
+        final double CLUSTERING_THRESHOLD = getThreshold();
+        clusterList = new ArrayList<ClusterItem>();
+        for (Marker item : this.mItemList) {
+            item.setClustered(false);
+            item.assignGroup(0);
+        }
+        currentGroup++;
+        for (Marker item : this.mItemList) {
+            if (item.getGroup() == 0) {
+                item.assignGroup(currentGroup);
+                item.setClustered(true);
+                int counter = 0;
+                for (Marker item2 : this.mItemList) {
+                    if (item2.getGroup() == 0 && PointF.length(screenX(item) - screenX(item2), screenY(item) - screenY(item2)) <= CLUSTERING_THRESHOLD) {
+                        item2.assignGroup(currentGroup);
+                        item2.setClustered(true);
+                        counter++;
+                    }
+                }
+                if (counter == 0) { // If the item has no markers near it there is no sense in clustering it
+                    item.setClustered(false);
+                    item.assignGroup(0);
+                }
+            }
+            currentGroup++;
+        }
+        getGroupSet();
+        view.getOverlays().remove(clusters);
+        if (clusters != null) {
+            clusters.removeAllItems();
+            initClusterOverlay();
+            clusters.addItems(clusterList);
+        } else {
+            initClusterOverlay();
+            clusters.addItems(clusterList);
+        }
+
+        view.getOverlays().add(clusters);
+        view.invalidate();
+
+    }
+
+
+    private ArrayList<ClusterItem> clusterList = new ArrayList<ClusterItem>();
+
+
+    private double getThreshold() {
+        WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        Display display = wm.getDefaultDisplay();
+        Point size = new Point();
+        if (android.os.Build.VERSION.SDK_INT >= 13) {
+            display.getSize(size);
+            return size.x / 10;
+        } else {
+            return display.getWidth();
+        }
+    }
+
+    private HashSet<Integer> getGroupSet() {
+        HashSet<Integer> set = new HashSet<Integer>();
+        for (Marker element : mItemList) {
+            if (!set.contains(element.getGroup())) {
+                set.add(element.getGroup());
+                generateCenterByGroup((ArrayList<Marker>) mItemList, element.getGroup());
+            }
+        }
+        return set;
+    }
+
+    private LatLng getCenter(ArrayList<Marker> list) {
+        int total = list.size();
+
+        double X = 0;
+        double Y = 0;
+        double Z = 0;
+
+        for (Marker i : list) {
+            LatLng point = i.getPoint();
+            double lat = point.getLatitude() * Math.PI / 180;
+            double lon = point.getLongitude() * Math.PI / 180;
+
+            double x = Math.cos(lat) * Math.cos(lon);
+            double y = Math.cos(lat) * Math.sin(lon);
+            double z = Math.sin(lat);
+
+            X += x;
+            Y += y;
+            Z += z;
+        }
+
+        X = X / total;
+        Y = Y / total;
+        Z = Z / total;
+
+        double Lon = Math.atan2(Y, X);
+        double Hyp = Math.sqrt(X * X + Y * Y);
+        double Lat = Math.atan2(Z, Hyp);
+
+        return new LatLng(Lat * 180 / Math.PI, Lon * 180 / Math.PI);
+    }
+
+
+    private void initClusterOverlay() {
+
+        clusters = new ItemizedIconOverlay<ClusterItem>(context, clusterList, new ItemizedIconOverlay.OnItemGestureListener<ClusterItem>() {
+            @Override
+            public boolean onItemSingleTapUp(int index, ClusterItem item) {
+                if (clusterActions != null) {
+                    clusterActions.onClusterTap(item);
+                } else {
+                    ArrayList<LatLng> activePoints = getCoordinateList(getGroupElements((List<Marker>) mItemList, item.getGroup()));
+                    view.zoomToBoundingBox(BoundingBox.fromLatLngs(activePoints));
+                }
+                return false;
+            }
+
+            @Override
+            public boolean onItemLongPress(int index, ClusterItem item) {
+                return false;
+            }
+        });
+        clusters.setCluster(true);
+    }
+
+    private LatLng generateCenterByGroup(ArrayList<Marker> list, int group) {
+        int sumlon = 0, sumlat = 0, count = 0;
+        ArrayList<Marker> tempList = getGroupElements(list, group);
+        LatLng result = getCenter(tempList);
+        ClusterItem m = new ClusterItem(view, result);
+        m.setMarker(context.getResources().getDrawable(R.drawable.clusteri));
+        m.assignGroup(group);
+        m.setMarkerHotspot(Marker.HotspotPlace.CENTER);
+        m.setChildCount(tempList.size());
+        if (m.getChildCount() > 1) {
+            clusterList.add(m);
+        }
+        return result;
+    }
+
+    private ArrayList<Marker> getGroupElements(List<Marker> list, int group) {
+        ArrayList<Marker> tempList = new ArrayList<Marker>();
+        for (Marker element : list) {
+            if (element.getGroup() == group) {
+                tempList.add(element);
+            }
+        }
+        return tempList;
+    }
+
+    private ArrayList<LatLng> getCoordinateList(List<Marker> list) {
+        ArrayList<LatLng> theList = new ArrayList<LatLng>();
+        for (Marker element : list) {
+            theList.add(element.getPoint());
+        }
+        return theList;
+    }
+
+
+    private float screenX(Marker item) {
+        return view.getProjection().toMapPixels(item.getPoint(), null).x;
+    }
+
+    private float screenY(Marker item) {
+        return view.getProjection().toMapPixels(item.getPoint(), null).y;
     }
 
     // ===========================================================
@@ -193,6 +365,26 @@ public class ItemizedIconOverlay<Item extends OverlayItem> extends ItemizedOverl
 
     public void setDrawnItemsLimit(final int aLimit) {
         this.mDrawnItemsLimit = aLimit;
+    }
+
+    public boolean isClusterOverlay() {
+        return isClusterOverlay;
+    }
+
+    public void setCluster(boolean cluster) {
+        this.isClusterOverlay = cluster;
+    }
+
+    public boolean isClusteringOn() {
+        return clusteringOn;
+    }
+
+    public void setClusteringOn(boolean clusteringOn) {
+        this.clusteringOn = clusteringOn;
+    }
+
+    public ClusterActions getClusterActions() {
+        return clusterActions;
     }
 
     // ===========================================================
@@ -212,5 +404,11 @@ public class ItemizedIconOverlay<Item extends OverlayItem> extends ItemizedOverl
 
     public static interface ActiveItem {
         public boolean run(final int aIndex);
+    }
+
+    public static interface ClusterActions {
+        public ISafeCanvas onClusterMarkerDraw(ClusterItem item, ISafeCanvas canvas);
+
+        public boolean onClusterTap(ClusterItem item);
     }
 }

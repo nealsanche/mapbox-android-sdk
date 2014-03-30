@@ -1,13 +1,12 @@
 package com.mapbox.mapboxsdk.geometry;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-
+import android.os.Parcel;
+import android.os.Parcelable;
 import com.mapbox.mapboxsdk.api.ILatLng;
 import com.mapbox.mapboxsdk.views.util.constants.MapViewConstants;
 
-import android.os.Parcel;
-import android.os.Parcelable;
+import java.io.Serializable;
+import java.util.ArrayList;
 
 /**
  * A rectangular geographical area defined in latitude and longitude units.
@@ -16,20 +15,23 @@ public final class BoundingBox implements Parcelable, Serializable, MapViewConst
 
     static final long serialVersionUID = 2L;
 
-    protected final double mLatNorth;
-    protected final double mLatSouth;
-    protected final double mLonEast;
-    protected final double mLonWest;
+    private final double mLatNorth;
+    private final double mLatSouth;
+    private final double mLonEast;
+    private final double mLonWest;
 
     /**
      * Construct a new bounding box based on its corners, given in NESW
      * order.
+     *
      * @param north
      * @param east
      * @param south
      * @param west
      */
-    public BoundingBox(final double north, final double east, final double south,
+    public BoundingBox(final double north,
+                       final double east,
+                       final double south,
                        final double west) {
         this.mLatNorth = north;
         this.mLonEast = east;
@@ -37,7 +39,14 @@ public final class BoundingBox implements Parcelable, Serializable, MapViewConst
         this.mLonWest = west;
     }
 
+    public BoundingBox() {
+        this(0, 0, 0, 0);
+    }
+
     /**
+     * Calculates the centerpoint of this bounding box by simple interpolation and returns
+     * it as a point. This is a non-geodesic calculation which is not the geographic center.
+     *
      * @return LatLng center of this BoundingBox
      */
     public LatLng getCenter() {
@@ -64,6 +73,7 @@ public final class BoundingBox implements Parcelable, Serializable, MapViewConst
     /**
      * Get the absolute distance, in degrees, between the north and
      * south boundaries of this bounding box
+     *
      * @return
      */
     public double getLatitudeSpan() {
@@ -73,6 +83,7 @@ public final class BoundingBox implements Parcelable, Serializable, MapViewConst
     /**
      * Get the absolute distance, in degrees, between the west and
      * east boundaries of this bounding box
+     *
      * @return
      */
     public double getLongitudeSpan() {
@@ -88,12 +99,20 @@ public final class BoundingBox implements Parcelable, Serializable, MapViewConst
                 .append(this.mLonWest).toString();
     }
 
-    public static BoundingBox fromGeoPoints(final ArrayList<? extends LatLng> partialPolyLine) {
-        double minLat = Double.MAX_VALUE;
-        double minLon = Double.MAX_VALUE;
-        double maxLat = Double.MIN_VALUE;
-        double maxLon = Double.MIN_VALUE;
-        for (final LatLng gp : partialPolyLine) {
+    /**
+     * Constructs a bounding box that contains all of a list of LatLng
+     * objects. Empty lists will yield invalid bounding boxes.
+     *
+     * @param latLngs
+     * @return
+     */
+    public static BoundingBox fromLatLngs(final ArrayList<? extends LatLng> latLngs) {
+        double minLat = 90,
+                minLon = 180,
+                maxLat = -90,
+                maxLon = -180;
+
+        for (final LatLng gp : latLngs) {
             final double latitude = gp.getLatitude();
             final double longitude = gp.getLongitude();
 
@@ -106,16 +125,23 @@ public final class BoundingBox implements Parcelable, Serializable, MapViewConst
         return new BoundingBox(maxLat, maxLon, minLat, minLon);
     }
 
+    /**
+     * Determines whether this bounding box matches another one exactly.
+     *
+     * @param other another bounding box
+     * @return a boolean indicating whether the bounding boxes are equal
+     */
     public boolean equals(final BoundingBox other) {
-        return mLatNorth == other.getLatNorth() &&
-                mLatSouth == other.getLatSouth() &&
-                mLonEast == other.getLonEast() &&
-                mLonWest == other.getLonWest();
+        return mLatNorth == other.getLatNorth()
+                && mLatSouth == other.getLatSouth()
+                && mLonEast == other.getLonEast()
+                && mLonWest == other.getLonWest();
     }
 
     /**
-     * Determine whether this bounding box contains a point and the point
+     * Determines whether this bounding box contains a point and the point
      * does not touch its boundary.
+     *
      * @param pGeoPoint the point which may be contained
      * @return true, if the point is contained within the box.
      */
@@ -124,6 +150,49 @@ public final class BoundingBox implements Parcelable, Serializable, MapViewConst
         final double longitude = pGeoPoint.getLongitude();
         return ((latitude < this.mLatNorth) && (latitude > this.mLatSouth))
                 && ((longitude < this.mLonEast) && (longitude > this.mLonWest));
+    }
+
+    public BoundingBox clone() {
+        return new BoundingBox(mLatNorth, mLonEast, mLatSouth, mLonWest);
+    }
+
+    /**
+     * Returns a new BoundingBox that stretches to contain both this and another BoundingBox.
+     *
+     * @param box
+     * @return
+     */
+    public BoundingBox union(BoundingBox box) {
+        if (box == null) {
+            return clone();
+        }
+        return union(box.getLatNorth(), box.getLatSouth(), box.getLonEast(), box.getLonWest());
+    }
+
+    /**
+     * Returns a new BoundingBox that stretches to include another bounding box,
+     * given by corner points.
+     *
+     * @param pLatNorth
+     * @param pLatSouth
+     * @param pLonEast
+     * @param pLonWest
+     * @return
+     */
+    public BoundingBox union(final double pLatNorth, final double pLatSouth,
+                             final double pLonEast,
+                             final double pLonWest) {
+        if ((pLonWest < pLonEast) && (pLatNorth < pLatSouth)) {
+            if ((this.mLonWest < this.mLonEast) && (this.mLatNorth < this.mLatSouth)) {
+                return new BoundingBox((this.mLatNorth < pLatNorth) ? pLatNorth : this.mLatNorth,
+                        (this.mLonEast < pLonEast) ? pLonEast : this.mLonEast,
+                        (this.mLatSouth > pLatSouth) ? pLatSouth : this.mLatSouth,
+                        (this.mLonWest > pLonWest) ? pLonWest : this.mLonWest);
+            } else {
+                return new BoundingBox(pLatNorth, pLonEast, pLatSouth, pLonWest);
+            }
+        }
+        return clone();
     }
 
     public static final Parcelable.Creator<BoundingBox> CREATOR = new Parcelable.Creator<BoundingBox>() {
@@ -137,6 +206,15 @@ public final class BoundingBox implements Parcelable, Serializable, MapViewConst
             return new BoundingBox[size];
         }
     };
+
+    @Override
+    public int hashCode() {
+        return (int) (
+                (mLatNorth + 90)
+                        + ((mLatSouth + 90) * 1000)
+                        + ((mLonEast + 180) * 1000000)
+                        + ((mLonEast + 180) * 1000000000));
+    }
 
     @Override
     public int describeContents() {

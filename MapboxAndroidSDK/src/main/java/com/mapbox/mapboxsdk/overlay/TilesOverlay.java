@@ -1,24 +1,27 @@
 package com.mapbox.mapboxsdk.overlay;
 
-import com.mapbox.mapboxsdk.ResourceProxy;
-import com.mapbox.mapboxsdk.tileprovider.MapTile;
-import com.mapbox.mapboxsdk.tileprovider.MapTileLayerBase;
-import com.mapbox.mapboxsdk.tileprovider.ReusableBitmapDrawable;
-import com.mapbox.mapboxsdk.util.TileLooper;
-import com.mapbox.mapboxsdk.tile.TileSystem;
-import com.mapbox.mapboxsdk.views.MapView;
-import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas;
-import android.util.Log;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Paint.Style;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.util.Log;
+
+import com.mapbox.mapboxsdk.tileprovider.MapTile;
+import com.mapbox.mapboxsdk.tileprovider.MapTileLayerBase;
+import com.mapbox.mapboxsdk.util.GeometryMath;
+import com.mapbox.mapboxsdk.util.TileLooper;
+import com.mapbox.mapboxsdk.util.constants.UtilConstants;
+import com.mapbox.mapboxsdk.views.MapView;
+import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas;
 import com.mapbox.mapboxsdk.views.util.Projection;
+
+import uk.co.senab.bitmapcache.CacheableBitmapDrawable;
 
 /**
  * These objects are the principle consumer of map tiles.
@@ -37,9 +40,10 @@ public class TilesOverlay
     protected final MapTileLayerBase mTileProvider;
 
     /* to avoid allocations during draw */
-    protected final Paint mDebugPaint = new Paint();
+    protected static Paint mDebugPaint = null;
     private final Rect mTileRect = new Rect();
     private final Rect mViewPort = new Rect();
+    float mCurrentZoomFactor = 1;
 
     private boolean mOptionsMenuEnabled = true;
 
@@ -52,18 +56,21 @@ public class TilesOverlay
     private int mLoadingBackgroundColor = Color.rgb(216, 208, 208);
     private int mLoadingLineColor = Color.rgb(200, 192, 192);
 
-    /**
-     * For overshooting the tile cache *
-     */
-    private int mOvershootTileCache = 0;
-
-    public TilesOverlay(final MapTileLayerBase aTileProvider, final ResourceProxy pResourceProxy) {
-        super(pResourceProxy);
+    public TilesOverlay(final MapTileLayerBase aTileProvider) {
+        super();
         if (aTileProvider == null) {
             throw new IllegalArgumentException(
                     "You must pass a valid tile provider to the tiles overlay.");
         }
         this.mTileProvider = aTileProvider;
+        if (UtilConstants.DEBUGMODE) {
+            if (mDebugPaint == null) {
+                mDebugPaint = new Paint();
+                mDebugPaint.setColor(Color.RED);
+                mDebugPaint.setStyle(Style.STROKE);
+                mDebugPaint.setStrokeWidth(2);
+            }
+        }
     }
 
     @Override
@@ -71,11 +78,11 @@ public class TilesOverlay
         this.mTileProvider.detach();
     }
 
-    public int getMinimumZoomLevel() {
+    public float getMinimumZoomLevel() {
         return mTileProvider.getMinimumZoomLevel();
     }
 
-    public int getMaximumZoomLevel() {
+    public float getMaximumZoomLevel() {
         return mTileProvider.getMaximumZoomLevel();
     }
 
@@ -105,17 +112,12 @@ public class TilesOverlay
 
         // Calculate the half-world size
         final Projection pj = mapView.getProjection();
-        final int zoomLevel = pj.getZoomLevel();
-        mWorldSize_2 = TileSystem.MapSize(zoomLevel) >> 1;
-
-        // Get the area we are drawing to
-        mViewPort.set(pj.getScreenRect());
-
-        // Translate the Canvas coordinates into Mercator coordinates
-        mViewPort.offset(mWorldSize_2, mWorldSize_2);
+        final float zoomLevel = pj.getZoomLevel();
+        mWorldSize_2 = pj.getHalfWorldSize();
+        GeometryMath.viewPortRect(pj, mViewPort);
 
         // Draw the tiles!
-        drawTiles(c.getSafeCanvas(), pj.getZoomLevel(), TileSystem.getTileSize(), mViewPort);
+        drawTiles(c.getSafeCanvas(), zoomLevel, Projection.getTileSize(), mViewPort);
     }
 
     /**
@@ -124,13 +126,13 @@ public class TilesOverlay
      * than the upper-left corner). Once the tile is ready to be drawn, it is passed to
      * onTileReadyToDraw where custom manipulations can be made before drawing the tile.
      */
-    public void drawTiles(final Canvas c, final int zoomLevel, final int tileSizePx,
+    public void drawTiles(final Canvas c, final float zoomLevel, final int tileSizePx,
                           final Rect viewPort) {
 
         mTileLooper.loop(c, zoomLevel, tileSizePx, viewPort);
 
         // draw a cross at center in debug mode
-        if (DEBUGMODE) {
+        if (UtilConstants.DEBUGMODE) {
             final Point centerPoint = new Point(viewPort.centerX() - mWorldSize_2,
                     viewPort.centerY() - mWorldSize_2);
             c.drawLine(centerPoint.x, centerPoint.y - 9,
@@ -143,10 +145,15 @@ public class TilesOverlay
 
     private final TileLooper mTileLooper = new TileLooper() {
         @Override
-        public void initializeLoop(final int pZoomLevel, final int pTileSizePx) {
-            // make sure the cache is big enough for all the tiles
-            final int numNeeded = (mLowerRight.y - mUpperLeft.y + 1) * (mLowerRight.x - mUpperLeft.x + 1);
-            mTileProvider.ensureCapacity(numNeeded + mOvershootTileCache);
+        public void initializeLoop(final float pZoomLevel, final int pTileSizePx) {
+
+            final int roundedZoom = (int) Math.floor(pZoomLevel);
+            if (roundedZoom != pZoomLevel) {
+                final int mapTileUpperBound = 1 << roundedZoom;
+                mCurrentZoomFactor = (float) Projection.mapSize(pZoomLevel) / mapTileUpperBound / pTileSizePx;
+            } else {
+                mCurrentZoomFactor = 1.0f;
+            }
         }
 
         @Override
@@ -156,22 +163,22 @@ public class TilesOverlay
                                final int pX,
                                final int pY) {
             Drawable currentMapTile = mTileProvider.getMapTile(pTile);
-            boolean isReusable = currentMapTile instanceof ReusableBitmapDrawable;
+            boolean isReusable = currentMapTile instanceof CacheableBitmapDrawable;
             if (currentMapTile == null) {
                 currentMapTile = getLoadingTile();
             }
 
             if (currentMapTile != null) {
                 mTileRect.set(
-                        pX * pTileSizePx,
-                        pY * pTileSizePx,
-                        pX * pTileSizePx + pTileSizePx,
-                        pY * pTileSizePx + pTileSizePx);
+                        (int) (pX * pTileSizePx * mCurrentZoomFactor),
+                        (int) (pY * pTileSizePx * mCurrentZoomFactor),
+                        (int) ((pX * pTileSizePx + pTileSizePx) * mCurrentZoomFactor),
+                        (int) ((pY * pTileSizePx + pTileSizePx) * mCurrentZoomFactor));
                 if (isReusable) {
-                    ((ReusableBitmapDrawable) currentMapTile).beginUsingDrawable();
+                    ((CacheableBitmapDrawable) currentMapTile).setBeingUsed(true);
                 }
                 try {
-                    if (isReusable && !((ReusableBitmapDrawable) currentMapTile).isBitmapValid()) {
+                    if (isReusable && !((CacheableBitmapDrawable) currentMapTile).isBitmapValid()) {
                         currentMapTile = getLoadingTile();
                         isReusable = false;
                     }
@@ -180,24 +187,17 @@ public class TilesOverlay
                     currentMapTile.draw(pCanvas);
                 } finally {
                     if (isReusable) {
-                        ((ReusableBitmapDrawable) currentMapTile).finishUsingDrawable();
+                        ((CacheableBitmapDrawable) currentMapTile).setBeingUsed(false);
                     }
+                }
+                if (UtilConstants.DEBUGMODE) {
+                    pCanvas.drawText(pTile.toString(), mTileRect.left + 1,
+                            mTileRect.top + mDebugPaint.getTextSize(), mDebugPaint);
+                    pCanvas.drawRect(mTileRect, mDebugPaint);
                 }
             }
 
-            if (DEBUGMODE) {
-                mTileRect.set(pX * pTileSizePx,
-                        pY * pTileSizePx,
-                        pX * pTileSizePx + pTileSizePx, pY
-                        * pTileSizePx + pTileSizePx);
-                mTileRect.offset(-mWorldSize_2, -mWorldSize_2);
-                pCanvas.drawText(pTile.toString(), mTileRect.left + 1,
-                        mTileRect.top + mDebugPaint.getTextSize(), mDebugPaint);
-                pCanvas.drawLine(mTileRect.left, mTileRect.top, mTileRect.right, mTileRect.top,
-                        mDebugPaint);
-                pCanvas.drawLine(mTileRect.left, mTileRect.top, mTileRect.left, mTileRect.bottom,
-                        mDebugPaint);
-            }
+
         }
 
         @Override
@@ -235,6 +235,7 @@ public class TilesOverlay
 
     /**
      * Draw a 'loading' placeholder with a canvas.
+     *
      * @return
      */
     private Drawable getLoadingTile() {
@@ -242,7 +243,7 @@ public class TilesOverlay
             try {
                 final int tileSize = mTileProvider.getTileSource() != null ?
                         mTileProvider
-                        .getTileSource().getTileSizePixels() : 256;
+                                .getTileSource().getTileSizePixels() : 256;
                 final Bitmap bitmap = Bitmap.createBitmap(tileSize, tileSize,
                         Bitmap.Config.ARGB_8888);
                 final Canvas canvas = new Canvas(bitmap);

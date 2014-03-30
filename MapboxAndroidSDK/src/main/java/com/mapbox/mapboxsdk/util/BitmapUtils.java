@@ -6,13 +6,17 @@
 package com.mapbox.mapboxsdk.util;
 
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.Drawable;
 import android.util.DisplayMetrics;
+
+import com.mapbox.mapboxsdk.R;
+
 import java.lang.reflect.Field;
 
-public class BitmapUtils
-{
-    public static BitmapFactory.Options getBitmapOptions(DisplayMetrics mDisplayMetrics)
-    {
+import uk.co.senab.bitmapcache.CacheableBitmapDrawable;
+
+public class BitmapUtils {
+    public static BitmapFactory.Options getBitmapOptions(DisplayMetrics mDisplayMetrics) {
         try {
             // TODO I think this can all be done without reflection now because all these properties are SDK 4
             final Field density = DisplayMetrics.class.getDeclaredField("DENSITY_DEFAULT");
@@ -29,5 +33,17 @@ public class BitmapUtils
             // ignore
         }
         return null;
+    }
+
+    public static boolean isCacheDrawableExpired(Drawable drawable) {
+        return drawable != null &&
+                drawable instanceof CacheableBitmapDrawable &&
+                ((CacheableBitmapDrawable) drawable).isBeingDisplayed();
+    }
+
+    public static void setCacheDrawableExpired(CacheableBitmapDrawable drawable) {
+        if (drawable != null) {
+            drawable.setBeingUsed(true);
+        }
     }
 }

@@ -19,6 +19,7 @@ public class MapTileRequestState {
 
     /**
      * Initialize a new state to keep track of a map tile
+     *
      * @param mapTile
      * @param providers
      * @param callback
@@ -27,13 +28,16 @@ public class MapTileRequestState {
                                final MapTileModuleLayerBase[] providers,
                                final IMapTileProviderCallback callback) {
         mProviderQueue = new LinkedList<MapTileModuleLayerBase>();
-        Collections.addAll(mProviderQueue, providers);
+        if (providers != null) {
+            Collections.addAll(mProviderQueue, providers);
+        }
         mMapTile = mapTile;
         mCallback = callback;
     }
 
     /**
      * Get the map tile this class owns
+     *
      * @return this map tile
      */
     public MapTile getMapTile() {
@@ -42,6 +46,7 @@ public class MapTileRequestState {
 
     /**
      * Get the assigned callback
+     *
      * @return the assigned callback
      */
     public IMapTileProviderCallback getCallback() {

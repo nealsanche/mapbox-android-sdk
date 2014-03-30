@@ -2,6 +2,8 @@
 and there is zero guarantee of API stability. Kick the tires at your own
 risk, they may explode.**
 
+[![Build Status](https://travis-ci.org/mapbox/mapbox-android-sdk.png?branch=master)](https://travis-ci.org/mapbox/mapbox-android-sdk)
+
 # Mapbox Android SDK
 
 An open source alternative for native maps on Android.
@@ -17,11 +19,35 @@ source, and experiment with the latest additions to the project.
 **With Gradle** *(recommended)*
 
 We use Gradle to generate a built version of our latest code in a matter of seconds.
-To use it with your IDE, make sure that Gradle is installed on your machine and
-import the project by selecting build.gradle as the project file.
+To use it with your IDE, make sure that to import the project by selecting `build.gradle` (in the project root directory) as the project file.
 
-If you don't have Gradle installed we also provide a small shell script that
-auto-extracts Gradle and builds the project. Run `build.sh` in a terminal, and you're set.
+Don't worry about installing Gradle on your system if you don't already have it (in fact it's easier if you don't).  The project makes use of Gradle Wrapper, which means that the correct / current project version of Gradle will automatically be installed and used to run the builds.  To use the Gradle wrapper just look for `gradlew` (UN*X) or `gradlew.bat` (Windows) in the project's main directory.  For example:
+
+```
+cd <PROJECT_ROOT>
+ ./gradlew --version
+```
+which will produce something like:
+
+```
+------------------------------------------------------------
+Gradle 1.10
+------------------------------------------------------------
+
+Build time:   2013-12-17 09:28:15 UTC
+Build number: none
+Revision:     36ced393628875ff15575fa03d16c1349ffe8bb6
+
+Groovy:       1.8.6
+Ant:          Apache Ant(TM) version 1.9.2 compiled on July 8 2013
+Ivy:          2.2.0
+JVM:          1.7.0_40 (Oracle Corporation 24.0-b56)
+OS:           Mac OS X 10.9.2 x86_64
+```
+
+For more information:
+
+http://www.gradle.org/docs/current/userguide/gradle_wrapper.html
 
 **Manually**
 
@@ -35,20 +61,5 @@ Building from source means you get the very latest version of our code. The firs
 * Go to Import Module... and select the OSMDroid folder
 * Repeat the step with the SDK
 * Go to File-Project Structure-Modules, and add both projects as module dependencies of your app project.
-
-#### Building in Eclipse
-
-* Download the project mapbox-android-sdk from github
-* Go to File -> Import... and select the Android -> Existing Android Code Into Workspace -> 
-* Choose directory of downloaded project.
-* Will appear two projects: mapbox-android-sdk\src and mapbox-android-sdk\test
-* In IDE you will see the errors in class "com.mapbox.mapboxsdk.views.MapView":
-* You need to correct the line 21: "import com.mapbox.mapboxforandroid.R;" to "import com.mapbox.mapboxsdk.R;" or just do "Organize imports"(Ctrl+Shift+O)
-* Then let's correct project name "src". Preferably, to rename "src" project name to "MapboxSDK", after rename you will get that your SDK project is compiled correctly. 
-* We can start using the SDK project, but in future we will need to use markers and to fix an issue in OSMDroidTests we need to add some default pictures which are in OSM android library and were not included in our SDK.
-* So what we gonna do is to add all '.png' images from OSM android jar  (https://code.google.com/p/osmdroid/downloads/detail?name=osmdroid-android-4.0.jar&can=1&q=) to resources folder to com.mapbox.mapboxsdk package. The main important image is marker_default.png that will cause you the errors in log if you are going to use markers in OSMDroidTest project.
-* SDK is ready to be used.
-* Open properties of the second project "OSMDroidTests" ->Android -> at the bottom you will see Library -> click on Add button to add your SDK project.
-* That's all now your test project - "OSMDroidTests" is working in Eclipse. Enjoy!
 
 ## [Quick-start Guide](https://github.com/mapbox/mapbox-android-sdk/blob/master/QUICKSTART.md)
