@@ -1,8 +1,7 @@
 package com.mapbox.mapboxsdk.views;
 
-import android.view.GestureDetector;
+import android.view.GestureDetector.SimpleOnGestureListener;
 import android.view.MotionEvent;
-
 import com.mapbox.mapboxsdk.api.ILatLng;
 import com.mapbox.mapboxsdk.util.constants.UtilConstants;
 
@@ -10,7 +9,7 @@ import com.mapbox.mapboxsdk.util.constants.UtilConstants;
  * A custom gesture detector that processes gesture events and dispatches them
  * to the map's overlay system.
  */
-public class MapViewGestureDetectorListener implements GestureDetector.OnGestureListener {
+public class MapViewGestureDetectorListener extends SimpleOnGestureListener {
 
     private final MapView mapView;
 
@@ -40,31 +39,26 @@ public class MapViewGestureDetectorListener implements GestureDetector.OnGesture
     }
 
     @Override
-    public boolean onFling(final MotionEvent e1,
-                           final MotionEvent e2,
-                           final float velocityX,
-                           final float velocityY) {
+    public boolean onFling(final MotionEvent e1, final MotionEvent e2, final float velocityX,
+            final float velocityY) {
         if (this.mapView.isAnimating() || this.mapView.getOverlayManager()
                 .onFling(e1, e2, velocityX, velocityY, this.mapView)) {
             return true;
         }
 
-        final int worldSize = this.mapView.getProjection().mapSize(this.mapView.getZoomLevel(false));
+        final int worldSize =
+                this.mapView.getProjection().mapSize(this.mapView.getZoomLevel(false));
         this.mapView.mIsFlinging = true;
-        this.mapView.mScroller.fling(
-                this.mapView.getScrollX(),
-                this.mapView.getScrollY(),
-                (int) -velocityX,
-                (int) -velocityY,
-                -worldSize,
-                worldSize,
-                -worldSize,
-                worldSize);
+        this.mapView.mScroller.fling(this.mapView.getScrollX(), this.mapView.getScrollY(),
+                (int) -velocityX, (int) -velocityY, -worldSize, worldSize, -worldSize, worldSize);
         return true;
     }
 
     @Override
     public void onLongPress(final MotionEvent e) {
+        if (this.mapView.getOverlayManager().onLongPress(e, this.mapView)) {
+            return;
+        }
         if (UtilConstants.DEBUGMODE) {
             final ILatLng center = this.mapView.getProjection().fromPixels(e.getX(), e.getY());
             this.mapView.zoomOutFixing(center);
@@ -73,9 +67,9 @@ public class MapViewGestureDetectorListener implements GestureDetector.OnGesture
 
     @Override
     public boolean onScroll(final MotionEvent e1, final MotionEvent e2, final float distanceX,
-                            final float distanceY) {
-        if (this.mapView.isAnimating() || this.mapView.getOverlayManager().onScroll(e1, e2, distanceX, distanceY,
-                this.mapView)) {
+            final float distanceY) {
+        if (this.mapView.isAnimating() || this.mapView.getOverlayManager()
+                .onScroll(e1, e2, distanceX, distanceY, this.mapView)) {
             return true;
         }
         this.mapView.getController().panBy((int) distanceX, (int) distanceY);
@@ -89,6 +83,20 @@ public class MapViewGestureDetectorListener implements GestureDetector.OnGesture
 
     @Override
     public boolean onSingleTapUp(final MotionEvent e) {
-        return this.mapView.getOverlayManager().onSingleTapUp(e, this.mapView);
+        return false;
+    }
+
+    @Override
+    public boolean onSingleTapConfirmed(final MotionEvent e) {
+        return this.mapView.getOverlayManager().onSingleTapConfirmed(e, this.mapView);
+    }
+
+    @Override
+    public boolean onDoubleTap(final MotionEvent e) {
+        if (this.mapView.getOverlayManager().onDoubleTap(e, this.mapView)) {
+            return true;
+        }
+        final ILatLng center = this.mapView.getProjection().fromPixels(e.getX(), e.getY());
+        return this.mapView.zoomInFixing(center);
     }
 }

@@ -6,10 +6,8 @@ import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
-
 import com.mapbox.mapboxsdk.overlay.Overlay.Snappable;
 import com.mapbox.mapboxsdk.views.MapView;
-
 import java.util.AbstractList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -74,11 +72,13 @@ public class OverlayManager extends AbstractList<Overlay> {
     }
 
     private Integer getOverlayClassSortIndex(Overlay overlay) {
-        int result = 1;
-        if (overlay instanceof UserLocationOverlay) {
-            result = 2;
-        } else if (overlay instanceof PathOverlay) {
+        int result = 2;
+        if (overlay instanceof MapEventsOverlay) {
             result = 0;
+        } else if (overlay instanceof UserLocationOverlay) {
+            result = 3;
+        } else if (overlay instanceof PathOverlay) {
+            result = 1;
         }
         return Integer.valueOf(result);
     }
@@ -101,10 +101,11 @@ public class OverlayManager extends AbstractList<Overlay> {
 
     public void setUseSafeCanvas(boolean useSafeCanvas) {
         mUseSafeCanvas = useSafeCanvas;
-        for (Overlay overlay : mOverlayList)
+        for (Overlay overlay : mOverlayList) {
             if (overlay instanceof SafeDrawOverlay) {
                 ((SafeDrawOverlay) overlay).setUseSafeCanvas(this.isUsingSafeCanvas());
             }
+        }
         if (mTilesOverlay != null) {
             mTilesOverlay.setUseSafeCanvas(this.isUsingSafeCanvas());
         }
@@ -179,7 +180,6 @@ public class OverlayManager extends AbstractList<Overlay> {
                 overlay.draw(c, pMapView, false);
             }
         }
-
     }
 
     public void onDetach(final MapView pMapView) {
@@ -232,7 +232,8 @@ public class OverlayManager extends AbstractList<Overlay> {
         return false;
     }
 
-    public boolean onSnapToItem(final int x, final int y, final Point snapPoint, final MapView pMapView) {
+    public boolean onSnapToItem(final int x, final int y, final Point snapPoint,
+            final MapView pMapView) {
         for (final Overlay overlay : this.overlaysReversed()) {
             if (overlay instanceof Snappable) {
                 if (((Snappable) overlay).onSnapToItem(x, y, snapPoint, pMapView)) {
@@ -244,8 +245,7 @@ public class OverlayManager extends AbstractList<Overlay> {
         return false;
     }
 
-	/* GestureDetector.OnDoubleTapListener */
-
+    /* GestureDetector.OnDoubleTapListener */
     public boolean onDoubleTap(final MotionEvent e, final MapView pMapView) {
         for (final Overlay overlay : this.overlaysReversed()) {
             if (overlay.onDoubleTap(e, pMapView)) {
@@ -276,8 +276,7 @@ public class OverlayManager extends AbstractList<Overlay> {
         return false;
     }
 
-	/* OnGestureListener */
-
+    /* OnGestureListener */
     public boolean onDown(final MotionEvent pEvent, final MapView pMapView) {
         for (final Overlay overlay : this.overlaysReversed()) {
             if (overlay.onDown(pEvent, pMapView)) {
@@ -289,7 +288,7 @@ public class OverlayManager extends AbstractList<Overlay> {
     }
 
     public boolean onFling(final MotionEvent pEvent1, final MotionEvent pEvent2,
-                           final float pVelocityX, final float pVelocityY, final MapView pMapView) {
+            final float pVelocityX, final float pVelocityY, final MapView pMapView) {
         for (final Overlay overlay : this.overlaysReversed()) {
             if (overlay.onFling(pEvent1, pEvent2, pVelocityX, pVelocityY, pMapView)) {
                 return true;
@@ -310,7 +309,7 @@ public class OverlayManager extends AbstractList<Overlay> {
     }
 
     public boolean onScroll(final MotionEvent pEvent1, final MotionEvent pEvent2,
-                            final float pDistanceX, final float pDistanceY, final MapView pMapView) {
+            final float pDistanceX, final float pDistanceY, final MapView pMapView) {
         for (final Overlay overlay : this.overlaysReversed()) {
             if (overlay.onScroll(pEvent1, pEvent2, pDistanceX, pDistanceY, pMapView)) {
                 return true;
@@ -347,7 +346,8 @@ public class OverlayManager extends AbstractList<Overlay> {
         }
     }
 
-    public boolean onCreateOptionsMenu(final Menu pMenu, final int menuIdOffset, final MapView mapView) {
+    public boolean onCreateOptionsMenu(final Menu pMenu, final int menuIdOffset,
+            final MapView mapView) {
         boolean result = true;
         for (final Overlay overlay : this.overlaysReversed()) {
             if (overlay instanceof IOverlayMenuProvider) {
@@ -361,7 +361,8 @@ public class OverlayManager extends AbstractList<Overlay> {
         return result;
     }
 
-    public boolean onPrepareOptionsMenu(final Menu pMenu, final int menuIdOffset, final MapView mapView) {
+    public boolean onPrepareOptionsMenu(final Menu pMenu, final int menuIdOffset,
+            final MapView mapView) {
         for (final Overlay overlay : this.overlaysReversed()) {
             if (overlay instanceof IOverlayMenuProvider) {
                 final IOverlayMenuProvider overlayMenuProvider = (IOverlayMenuProvider) overlay;
@@ -374,12 +375,13 @@ public class OverlayManager extends AbstractList<Overlay> {
         return true;
     }
 
-    public boolean onOptionsItemSelected(final MenuItem item, final int menuIdOffset, final MapView mapView) {
+    public boolean onOptionsItemSelected(final MenuItem item, final int menuIdOffset,
+            final MapView mapView) {
         for (final Overlay overlay : this.overlaysReversed()) {
             if (overlay instanceof IOverlayMenuProvider) {
                 final IOverlayMenuProvider overlayMenuProvider = (IOverlayMenuProvider) overlay;
-                if (overlayMenuProvider.isOptionsMenuEnabled() &&
-                        overlayMenuProvider.onOptionsItemSelected(item, menuIdOffset, mapView)) {
+                if (overlayMenuProvider.isOptionsMenuEnabled()
+                        && overlayMenuProvider.onOptionsItemSelected(item, menuIdOffset, mapView)) {
                     return true;
                 }
             }

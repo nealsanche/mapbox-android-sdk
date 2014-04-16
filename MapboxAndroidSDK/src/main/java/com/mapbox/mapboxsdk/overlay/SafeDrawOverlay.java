@@ -1,12 +1,12 @@
 package com.mapbox.mapboxsdk.overlay;
 
-import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas;
-import com.mapbox.mapboxsdk.views.safecanvas.SafeTranslatedCanvas;
-import com.mapbox.mapboxsdk.views.MapView;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Rect;
-import android.os.Build;
+import com.mapbox.mapboxsdk.views.MapView;
+import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas;
+import com.mapbox.mapboxsdk.views.safecanvas.SafeTranslatedCanvas;
+import com.nineoldandroids.view.ViewHelper;
 
 /**
  * An overlay class that uses the safe drawing canvas to draw itself and can be zoomed in to high
@@ -20,7 +20,8 @@ public abstract class SafeDrawOverlay extends Overlay {
     private static final Matrix sMatrix = new Matrix();
     private boolean mUseSafeCanvas = true;
 
-    protected abstract void drawSafe(final ISafeCanvas c, final MapView mapView, final boolean shadow);
+    protected abstract void drawSafe(final ISafeCanvas c, final MapView mapView,
+            final boolean shadow);
 
     public SafeDrawOverlay() {
         super();
@@ -31,7 +32,7 @@ public abstract class SafeDrawOverlay extends Overlay {
 
         sSafeCanvas.setCanvas(c);
 
-        if (this.isUsingSafeCanvas()) {
+        if (this.mUseSafeCanvas) {
 
             // Find the screen offset
             Rect screenRect = mapView.getProjection().getScreenRect();
@@ -53,31 +54,24 @@ public abstract class SafeDrawOverlay extends Overlay {
             final int floatErrorY = screenRect.top - (int) (float) screenRect.top;
 
             // Translate the coordinates
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-                final float scaleX = mapView.getScaleX();
-                final float scaleY = mapView.getScaleY();
-                c.translate(screenRect.left * scaleX, screenRect.top * scaleY);
-                c.translate(floatErrorX, floatErrorY);
-            } else {
-                c.getMatrix(sMatrix);
-                sMatrix.preTranslate(screenRect.left, screenRect.top);
-                sMatrix.preTranslate(floatErrorX, floatErrorY);
-                c.setMatrix(sMatrix);
-            }
+            final float scaleX = ViewHelper.getScaleX(mapView);
+            final float scaleY = ViewHelper.getScaleY(mapView);
+            c.translate(screenRect.left * scaleX, screenRect.top * scaleY);
+            c.translate(floatErrorX, floatErrorY);
 
             if (mapView.getMapOrientation() != 0) {
                 // Safely re-rotate the maps
                 sSafeCanvas.rotate(mapView.getMapOrientation(), (double) screenRect.exactCenterX(),
                         (double) screenRect.exactCenterY());
             }
-
         } else {
             sSafeCanvas.xOffset = 0;
             sSafeCanvas.yOffset = 0;
         }
+
         this.drawSafe(sSafeCanvas, mapView, shadow);
 
-        if (this.isUsingSafeCanvas()) {
+        if (this.mUseSafeCanvas) {
             c.restore();
         }
     }

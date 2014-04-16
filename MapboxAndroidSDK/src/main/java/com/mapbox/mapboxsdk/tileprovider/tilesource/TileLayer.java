@@ -1,7 +1,6 @@
 package com.mapbox.mapboxsdk.tileprovider.tilesource;
 
 import android.graphics.drawable.Drawable;
-
 import com.mapbox.mapboxsdk.geometry.BoundingBox;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.tileprovider.MapTile;
@@ -12,6 +11,7 @@ import com.mapbox.mapboxsdk.views.util.constants.MapViewConstants;
 public class TileLayer implements ITileLayer, TileLayerConstants, MapViewConstants {
 
     protected String mUrl;
+    protected String mCacheKey;
     protected String mName;
     protected String mDescription;
     protected String mAttribution;
@@ -23,14 +23,13 @@ public class TileLayer implements ITileLayer, TileLayerConstants, MapViewConstan
     protected LatLng mCenter = new LatLng(0, 0);
     private final int mTileSizePixels = DEFAULT_TILE_SIZE;
 
-    public TileLayer(final String aUrl) {
+    public TileLayer(final String pId, final String aUrl) {
         mUrl = aUrl;
+        mCacheKey = pId;
     }
 
     /**
      * Sets the layer's tile URL template string.
-     * @param aUrl
-     * @return
      */
     public TileLayer setURL(final String aUrl) {
         mUrl = aUrl;
@@ -39,8 +38,6 @@ public class TileLayer implements ITileLayer, TileLayerConstants, MapViewConstan
 
     /**
      * Sets the layer's attribution string.
-     * @param aAttribution
-     * @return
      */
     public TileLayer setAttribution(final String aAttribution) {
         this.mAttribution = aAttribution;
@@ -49,8 +46,6 @@ public class TileLayer implements ITileLayer, TileLayerConstants, MapViewConstan
 
     /**
      * Sets the layer's description string.
-     * @param aDescription
-     * @return
      */
     public TileLayer setDescription(final String aDescription) {
         this.mDescription = aDescription;
@@ -59,8 +54,6 @@ public class TileLayer implements ITileLayer, TileLayerConstants, MapViewConstan
 
     /**
      * Sets the layer's name.
-     * @param aName
-     * @return
      */
     public TileLayer setName(final String aName) {
         this.mName = aName;
@@ -69,8 +62,6 @@ public class TileLayer implements ITileLayer, TileLayerConstants, MapViewConstan
 
     /**
      * Sets the layer's minimum zoom level.
-     * @param aMinimumZoomLevel
-     * @return
      */
     public TileLayer setMinimumZoomLevel(final float aMinimumZoomLevel) {
         this.mMinimumZoomLevel = aMinimumZoomLevel;
@@ -79,15 +70,14 @@ public class TileLayer implements ITileLayer, TileLayerConstants, MapViewConstan
 
     /**
      * Sets the layer's minimum zoom level.
-     * @param aMaximumZoomLevel
-     * @return
      */
     public TileLayer setMaximumZoomLevel(final float aMaximumZoomLevel) {
         this.mMaximumZoomLevel = aMaximumZoomLevel;
         return this;
     }
 
-    public Drawable getDrawableFromTile(final MapTileDownloader downloader, final MapTile aTile, boolean hdpi) {
+    public Drawable getDrawableFromTile(final MapTileDownloader downloader, final MapTile aTile,
+            boolean hdpi) {
         return null;
     }
 
@@ -111,11 +101,9 @@ public class TileLayer implements ITileLayer, TileLayerConstants, MapViewConstan
         return mTileSizePixels;
     }
 
-    final private String TAG = "OnlineTileSource";
-
     @Override
     public String getCacheKey() {
-        return "";
+        return mCacheKey;
     }
 
     @Override

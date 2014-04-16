@@ -1,16 +1,13 @@
 package com.mapbox.mapboxsdk.events;
 
+import android.os.Handler;
 import android.util.Log;
 
-import android.os.Handler;
-
-/*
+/**
  * A MapListener that aggregates multiple events called in quick succession.
  * After an event arrives, if another event arrives within <code>delay</code> milliseconds,
  * the original event is discarded.  Otherwise, the event is propagated to the wrapped
- * MapListener.  Note: This class is not thread-safe.
- *
- * @author Theodore Hong
+ * MapListener.  Note: This class is not thread-safe.]
  */
 public class DelayedMapListener implements MapListener {
 
@@ -32,25 +29,24 @@ public class DelayedMapListener implements MapListener {
     protected Handler handler;
     protected CallbackTask callback;
 
-    /*
-     * @param wrappedListener The wrapped MapListener
-     *
-     * @param delay Listening delay, in milliseconds
+    /**
+     * @param aWrappedListener The wrapped MapListener
+     * @param aDelay Listening delay, in milliseconds
      */
-    public DelayedMapListener(final MapListener wrappedListener, final long delay) {
-        this.wrappedListener = wrappedListener;
-        this.delay = delay;
+    public DelayedMapListener(final MapListener aWrappedListener, final long aDelay) {
+        this.wrappedListener = aWrappedListener;
+        this.delay = aDelay;
         this.handler = new Handler();
         this.callback = null;
     }
 
-    /*
+    /**
      * Constructor with default delay.
      *
-     * @param wrappedListener The wrapped MapListener
+     * @param aWrappedListener The wrapped MapListener
      */
-    public DelayedMapListener(final MapListener wrappedListener) {
-        this(wrappedListener, DEFAULT_DELAY);
+    public DelayedMapListener(final MapListener aWrappedListener) {
+        this(aWrappedListener, DEFAULT_DELAY);
     }
 
     @Override

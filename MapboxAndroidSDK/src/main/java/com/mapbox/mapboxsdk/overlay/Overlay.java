@@ -1,16 +1,17 @@
 // Created by plusminus on 20:32:01 - 27.09.2008
 package com.mapbox.mapboxsdk.overlay;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-import com.mapbox.mapboxsdk.views.MapView;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import com.mapbox.mapboxsdk.views.MapView;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Base class representing an overlay which may be displayed on top of a {@link MapView}. To add an
@@ -65,13 +66,14 @@ public abstract class Overlay {
     }
 
     /**
-     * Since the menu-chain will pass through several independent Overlays, menu IDs cannot be fixed
+     * Since the menu-chain will pass through several independent Overlays, menu IDs cannot be
+     * fixed
      * at compile time. Overlays should use this method to obtain and store a menu id for each menu
      * item at construction time. This will ensure that two overlays don't use the same id.
      *
      * @return an integer suitable to be used as a menu identifier
      */
-    protected final static int getSafeMenuId() {
+    protected static final int getSafeMenuId() {
         return sOrdinal.getAndIncrement();
     }
 
@@ -188,7 +190,7 @@ public abstract class Overlay {
      * this event.
      */
     public boolean onFling(final MotionEvent pEvent1, final MotionEvent pEvent2,
-                           final float pVelocityX, final float pVelocityY, final MapView pMapView) {
+            final float pVelocityX, final float pVelocityY, final MapView pMapView) {
         return false;
     }
 
@@ -209,7 +211,7 @@ public abstract class Overlay {
      * this event.
      */
     public boolean onScroll(final MotionEvent pEvent1, final MotionEvent pEvent2,
-                            final float pDistanceX, final float pDistanceY, final MapView pMapView) {
+            final float pDistanceX, final float pDistanceY, final MapView pMapView) {
         return false;
     }
 
@@ -228,21 +230,25 @@ public abstract class Overlay {
 
     /**
      * Convenience method to draw a Drawable at an offset. x and y are pixel coordinates. You can
-     * find appropriate coordinates from latitude/longitude using the MapView.getProjection() method
+     * find appropriate coordinates from latitude/longitude using the MapView.getProjection()
+     * method
      * on the MapView passed to you in draw(Canvas, MapView, boolean).
      *
-     * @param shadow          If true, draw only the drawable's shadow. Otherwise, draw the drawable itself.
-     * @param aMapOrientation
+     * @param shadow If true, draw only the drawable's shadow. Otherwise, draw the drawable itself.
      */
-    protected synchronized static void drawAt(final Canvas canvas, final Drawable drawable,
-                                              final int x, final int y, final boolean shadow,
-                                              final float aMapOrientation) {
+    protected static synchronized void drawAt(final Canvas canvas, final Drawable drawable,
+            final Point origin, final Point offset, final boolean shadow,
+            final float aMapOrientation) {
         canvas.save();
-        canvas.rotate(-aMapOrientation, x, y);
-        drawable.copyBounds(mRect);
-        drawable.setBounds(mRect.left + x, mRect.top + y, mRect.right + x, mRect.bottom + y);
+        canvas.rotate(-aMapOrientation, origin.x, origin.y);
+        canvas.translate(origin.x + offset.x, origin.y + offset.y);
         drawable.draw(canvas);
-        drawable.setBounds(mRect);
+        Paint paint = new Paint();
+        paint.setColor(Color.RED);
+        paint.setStrokeWidth(3);
+        canvas.drawLine(0, -9, 0, 9, paint);
+        canvas.drawLine(-9, 0, 9, 0, paint);
+        canvas.drawRect(drawable.getBounds(), paint);
         canvas.restore();
     }
 
@@ -257,12 +263,15 @@ public abstract class Overlay {
          * Checks to see if the given x and y are close enough to an item resulting in snapping the
          * current action (e.g. zoom) to the item.
          *
-         * @param x         The x in screen coordinates.
-         * @param y         The y in screen coordinates.
-         * @param snapPoint To be filled with the the interesting point (in screen coordinates) that is
-         *                  closest to the given x and y. Can be untouched if not snapping.
-         * @param mapView   The {@link MapView} that is requesting the snap. Use MapView.getProjection()
-         *                  to convert between on-screen pixels and latitude/longitude pairs.
+         * @param x The x in screen coordinates.
+         * @param y The y in screen coordinates.
+         * @param snapPoint To be filled with the the interesting point (in screen coordinates)
+         * that
+         * is
+         * closest to the given x and y. Can be untouched if not snapping.
+         * @param mapView The {@link MapView} that is requesting the snap. Use
+         * MapView.getProjection()
+         * to convert between on-screen pixels and latitude/longitude pairs.
          * @return Whether or not to snap to the interesting point.
          */
         boolean onSnapToItem(int x, int y, Point snapPoint, MapView mapView);

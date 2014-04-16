@@ -1,12 +1,14 @@
 package com.mapbox.mapboxsdk.tileprovider;
 
-import com.mapbox.mapboxsdk.overlay.TilesOverlay;
+import android.graphics.Rect;
 
 /**
  * A map tile is distributed using the observer pattern. The tile is delivered by a tile provider
- * (i.e. a descendant of {@link com.mapbox.mapboxsdk.tileprovider.modules.MapTileModuleLayerBase} or
+ * (i.e. a descendant of {@link com.mapbox.mapboxsdk.tileprovider.modules.MapTileModuleLayerBase}
+ * or
  * {@link MapTileLayerBase} to a consumer of tiles (e.g. descendant of
- * {@link TilesOverlay}). Tiles are typically images (e.g. png or jpeg).
+ * {@link com.mapbox.mapboxsdk.overlay.TilesOverlay}). Tiles are typically images (e.g. png or
+ * jpeg).
  */
 public class MapTile {
 
@@ -18,11 +20,24 @@ public class MapTile {
     private final int x;
     private final int y;
     private final int z;
+    private final String path;
+    private final String cacheKey;
+    private final int code;
+    private Rect mTileRect;
 
     public MapTile(final int az, final int ax, final int ay) {
+        this("", az, ax, ay);
+    }
+
+    public MapTile(final String aCacheKey, final int az, final int ax, final int ay) {
         this.z = az;
         this.x = ax;
         this.y = ay;
+        this.path = String.valueOf(z) + "/" +
+                String.valueOf(x) + "/" +
+                String.valueOf(y);
+        this.cacheKey = aCacheKey + "/" + path;
+        this.code = ((17 * (37 + z)) * (37 * x)) * (37 + y);
     }
 
     public int getZ() {
@@ -37,9 +52,13 @@ public class MapTile {
         return y;
     }
 
+    public String getCacheKey() {
+        return cacheKey;
+    }
+
     @Override
     public String toString() {
-        return "/" + z + "/" + x + "/" + y;
+        return path;
     }
 
     @Override
@@ -59,10 +78,14 @@ public class MapTile {
 
     @Override
     public int hashCode() {
-        int code = 17;
-        code *= 37 + z;
-        code *= 37 + x;
-        code *= 37 + y;
-        return code;
+        return this.code;
+    }
+
+    public void setTileRect(final Rect rect) {
+        mTileRect = rect;
+    }
+
+    public final Rect getTileRect() {
+        return mTileRect;
     }
 }

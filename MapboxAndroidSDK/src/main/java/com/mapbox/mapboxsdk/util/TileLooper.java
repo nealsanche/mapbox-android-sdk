@@ -1,15 +1,14 @@
 package com.mapbox.mapboxsdk.util;
 
-import com.mapbox.mapboxsdk.views.util.Projection;
-import com.mapbox.mapboxsdk.tileprovider.MapTile;
-
 import android.graphics.Canvas;
 import android.graphics.Point;
 import android.graphics.Rect;
-
+import android.os.Handler;
+import com.mapbox.mapboxsdk.tileprovider.MapTile;
+import com.mapbox.mapboxsdk.views.util.Projection;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.List;
+import uk.co.senab.bitmapcache.CacheableBitmapDrawable;
 
 /**
  * A class that will loop around all the map tiles in the given viewport.
@@ -19,65 +18,52 @@ public abstract class TileLooper {
     protected final Point mUpperLeft = new Point();
     protected final Point mLowerRight = new Point();
     protected final Point center = new Point();
+    protected List<CacheableBitmapDrawable> mBeingUsedDrawables =
+            new ArrayList<CacheableBitmapDrawable>();
 
-    public final void loop(final Canvas pCanvas, final float pZoomLevel, final int pTileSizePx, final Rect pViewPort) {
+    public final void loop(final Canvas pCanvas, final String pCacheKey, final float pZoomLevel,
+            final int pTileSizePx, final Rect pViewPort, final Rect pClipRect) {
         // Calculate the amount of tiles needed for each side around the center one.
         Projection.pixelXYToTileXY(pViewPort.left, pViewPort.top, mUpperLeft);
         mUpperLeft.offset(-1, -1);
+
         Projection.pixelXYToTileXY(pViewPort.right, pViewPort.bottom, mLowerRight);
         mLowerRight.offset(1, 1);
+
         center.set((mUpperLeft.x + mLowerRight.x) / 2, (mUpperLeft.y + mLowerRight.y) / 2);
+
         final int roundedZoom = (int) Math.floor(pZoomLevel);
         final int mapTileUpperBound = 1 << roundedZoom;
-        ArrayList<Point> orderedList = new ArrayList<Point>();
         initializeLoop(pZoomLevel, pTileSizePx);
 
-        /**
-         * TO DO - there is definitely a more efficient way of doing this
-         */
+        int tileX, tileY;
+
         for (int y = mUpperLeft.y; y <= mLowerRight.y; y++) {
             for (int x = mUpperLeft.x; x <= mLowerRight.x; x++) {
-                orderedList.add(new Point(x, y));
+                tileY = GeometryMath.mod(y, mapTileUpperBound);
+                tileX = GeometryMath.mod(x, mapTileUpperBound);
+                final MapTile tile = new MapTile(pCacheKey, roundedZoom, tileX, tileY);
+                handleTile(pCanvas, pCacheKey, pTileSizePx, tile, x, y, pClipRect);
             }
         }
-        Collections.sort(orderedList, new ClosenessToCenterComparator());
-        for (Point point : orderedList) {
-            final int tileY = GeometryMath.mod(point.y, mapTileUpperBound);
-            final int tileX = GeometryMath.mod(point.x, mapTileUpperBound);
-            final MapTile tile = new MapTile(roundedZoom, tileX, tileY);
-            handleTile(pCanvas, pTileSizePx, tile, point.x, point.y);
-        }
-
         finalizeLoop();
-    }
-
-    /**
-     * Compares two points for which one is closer to the center
-     */
-    protected class ClosenessToCenterComparator implements Comparator<Point> {
-        @Override
-        public int compare(Point one, Point two) {
-            double oneLength = length(one);
-            double twoLength = length(two);
-            if (oneLength > twoLength) {
-                return 1;
-            } else if (oneLength < twoLength) {
-                return -1;
-            } else {
-                return 0;
-            }
-        }
-
-        private double length(Point point) {
-            return Math.sqrt(
-                    ((point.x - center.x) * (point.x - center.x)) +
-                            ((point.y - center.y) * (point.y - center.y)));
-        }
     }
 
     public abstract void initializeLoop(float pZoomLevel, int pTileSizePx);
 
-    public abstract void handleTile(Canvas pCanvas, int pTileSizePx, MapTile pTile, int pX, int pY);
+    public abstract void handleTile(Canvas pCanvas, final String pCacheKey, int pTileSizePx,
+            MapTile pTile, int pX, int pY, final Rect pClipRect);
 
-    public abstract void finalizeLoop();
+    public void finalizeLoop() {
+        //we delay just to make sure drawable bitmaps are not reused while being drawn.
+        (new Handler()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                for (CacheableBitmapDrawable drawable : mBeingUsedDrawables) {
+                    drawable.setBeingUsed(false);
+                }
+                mBeingUsedDrawables.clear();
+            }
+        }, 1);
+    }
 }

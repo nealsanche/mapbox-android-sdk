@@ -1,119 +1,66 @@
-// Created by plusminus on 00:02:58 - 03.10.2008
 package com.mapbox.mapboxsdk.overlay;
 
 import android.content.Context;
 import android.graphics.Point;
+import android.graphics.PointF;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
-
+import com.google.common.base.Strings;
 import com.mapbox.mapboxsdk.R;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.views.InfoWindow;
 import com.mapbox.mapboxsdk.views.MapView;
+import com.mapbox.mapboxsdk.views.util.Projection;
 
 /**
  * Immutable class describing a LatLng with a Title and a Description.
- *
- * @author Nicolas Gramlich
- * @author Theodore Hong
- * @author Fred Eisele
  */
 public class Marker {
-
-    // ===========================================================
-    // Constants
-    // ===========================================================
     public static final int ITEM_STATE_FOCUSED_MASK = 4;
     public static final int ITEM_STATE_PRESSED_MASK = 1;
     public static final int ITEM_STATE_SELECTED_MASK = 2;
 
-    protected static final Point DEFAULT_MARKER_SIZE = new Point(26, 94);
     private int group = 0;
-    private boolean clustered;
+    private boolean mClustered;
 
+    private final RectF mMyLocationRect = new RectF(0, 0, 0, 0);
+    private final RectF mMyLocationPreviousRect = new RectF(0, 0, 0, 0);
+    protected final PointF mCurMapCoords = new PointF();
 
-    public int getGroup() {
-        return group;
-    }
-
-    public void assignGroup(int currentGroup) {
-        if (currentGroup == 0) {
-            this.setClustered(false);
-        }
-        group = currentGroup;
-    }
-
-    public boolean beingClustered() {
-        return clustered;
-    }
-
-    public void setClustered(boolean clustered) {
-        this.clustered = clustered;
-    }
-
-
-    protected InfoWindow createTooltip(MapView mv){
-        return new InfoWindow(R.layout.tootip, mv);
-    }
-
-    private InfoWindow mToolTip;
-    public InfoWindow getToolTip(MapView mv) {
-        if (mToolTip == null || mToolTip.getMapView() != mv) {
-            mToolTip = createTooltip(mv);
-        }
-        return mToolTip;
-    }
-
-
-    /**
-     * Indicates a hotspot for an area. This is where the origin (0,0) of a point will be located
-     * relative to the area. In otherwords this acts as an offset. NONE indicates that no adjustment
-     * should be made.
-     */
-    public enum HotspotPlace {
-        NONE, CENTER, BOTTOM_CENTER, TOP_CENTER, RIGHT_CENTER, LEFT_CENTER, UPPER_RIGHT_CORNER, LOWER_RIGHT_CORNER, UPPER_LEFT_CORNER, LOWER_LEFT_CORNER
-    }
-
-    // ===========================================================
-    // Fields
-    // ===========================================================
+    private Context context;
+    private MapView mapView;
+    private Icon icon;
 
     protected String mUid;
-    protected String mSnippet;
     protected LatLng mLatLng;
     protected Drawable mMarker;
-    protected HotspotPlace mHotspotPlace;
+    protected PointF mAnchor = null;
 
-    private String mTitle, mDescription; // now, they are modifiable
-    private String mSubDescription; //a third field that can be displayed in the infowindow, on a third line
+    private String mTitle = "";
+    private String mDescription = "";
+    private String mSubDescription = "";
+    //a third field that can be displayed in the infowindow, on a third line
     private Drawable mImage; //that will be shown in the infowindow.
     //private GeoPoint mGeoPoint //unfortunately, this is not so simple...
     private Object mRelatedObject; //reference to an object (of any kind) linked to this item.
     private boolean bubbleShowing;
+    private ItemizedOverlay mParentHolder;
 
-    // ===========================================================
-    // Constructors
-    // ===========================================================
-
-    public Marker(final String aUid, final String aTitle, final String aDescription,
-                  final LatLng aLatLng) {
-        this.mTitle = aTitle;
-        this.mSnippet = aDescription;
-        this.mLatLng = aLatLng;
-        this.mUid = aUid;
-    }
-
-    public Marker(String title, String s, LatLng aLatLng) {
-        this((MapView) null, title, s, aLatLng);
+    /**
+     * Construct a new Marker, given title, description, and place
+     */
+    public Marker(String title, String description, LatLng latLng) {
+        this(null, title, description, latLng);
     }
 
     /**
      * Initialize a new marker object, adding it to a MapView and attaching a tooltip
      *
-     * @param mv           a mapview
-     * @param aTitle       the title of the marker, in a potential tooltip
+     * @param mv a mapview
+     * @param aTitle the title of the marker, in a potential tooltip
      * @param aDescription the description of the marker, in a tooltip
-     * @param aLatLng      the location of the marker
+     * @param aLatLng the location of the marker
      */
     public Marker(MapView mv, String aTitle, String aDescription, LatLng aLatLng) {
         this.setTitle(aTitle);
@@ -121,25 +68,69 @@ public class Marker {
         this.mLatLng = aLatLng;
         Log.d(getClass().getCanonicalName(), "markerconst" + mv + aTitle + aDescription + aLatLng);
         if (mv != null) {
-            context = mv.getContext();
-            mapView = mv;
-            this.setMarker(context.getResources().getDrawable(R.drawable.defpin));
+            mAnchor = mv.getDefaultPinAnchor();
+        }
+        mParentHolder = null;
+    }
+
+    public Marker addTo(MapView mv) {
+        if (mMarker == null) {
+            //if there is an icon it means it's not loaded yet
+            //thus change the drawable while waiting
+            setMarker(mv.getDefaultPinDrawable());
+        }
+        mapView = mv;
+        context = mv.getContext();
+        if (mAnchor == null) {
+            mAnchor = mv.getDefaultPinAnchor();
+        }
+        return this;
+    }
+
+    public boolean hasContent() {
+        return !Strings.isNullOrEmpty(this.mTitle) ||
+                !Strings.isNullOrEmpty(this.mDescription) ||
+                !Strings.isNullOrEmpty(this.mSubDescription) ||
+                this.mImage != null;
+    }
+
+    protected InfoWindow createTooltip(MapView mv) {
+        return new InfoWindow(R.layout.tooltip, mv);
+    }
+
+    private InfoWindow mToolTip;
+
+    public InfoWindow getToolTip(MapView mv) {
+        if (mToolTip == null || mToolTip.getMapView() != mv) {
+            mToolTip = createTooltip(mv);
+        }
+        return mToolTip;
+    }
+
+    public void blur() {
+        if (mParentHolder != null) {
+            mParentHolder.blurItem(this);
         }
     }
 
-    // ===========================================================
-    // Getter & Setter
-    // ===========================================================
+    /**
+     * Indicates a hotspot for an area. This is where the origin (0,0)of a point will be located
+     * relative to the area. In otherwords this acts as an offset. NONE indicates that no
+     * adjustment
+     * should be made.
+     */
+    public enum HotspotPlace {
+        NONE, CENTER, BOTTOM_CENTER, TOP_CENTER, RIGHT_CENTER,
+        LEFT_CENTER, UPPER_RIGHT_CORNER, LOWER_RIGHT_CORNER,
+        UPPER_LEFT_CORNER, LOWER_LEFT_CORNER
+    }
+
     public String getUid() {
         return mUid;
     }
 
     public String getTitle() {
         return mTitle;
-    }
-
-    public String getSnippet() {
-        return mSnippet;
     }
 
     public LatLng getPoint() {
@@ -182,18 +173,14 @@ public class Marker {
         return mRelatedObject;
     }
 
-    /*
-     * (copied from Google API docs) Returns the marker that should be used when drawing this item
-     * on the map. A null value means that the default marker should be drawn. Different markers can
-     * be returned for different states. The different markers can have different bounds. The
-     * default behavior is to call {@link setState(android.graphics.drawable.Drawable, int)} on the
-     * overlay item's marker, if it exists, and then return it.
-     *
-     * @param stateBitset The current state.
-     *
-     * @return The marker for the current state, or null if the default marker for the overlay
-     * should be used.
-     */
+    public ItemizedOverlay getParentHolder() {
+        return mParentHolder;
+    }
+
+    public void setParentHolder(ItemizedOverlay o) {
+        mParentHolder = o;
+    }
+
     public Drawable getMarker(final int stateBitset) {
         // marker not specified
         if (mMarker == null) {
@@ -207,40 +194,67 @@ public class Marker {
 
     public void setMarker(final Drawable marker) {
         this.mMarker = marker;
-
-//        mapView.invalidateMapCoordinates(marker.getBounds());
-
-/*
-        // Determine bounding box of drawable
-        Point point = mapView.getProjection().toMapPixels(latLng, null);
-        int widthBuffer = getWidth() / 2;
-        int heightBuffer = getHeight() / 2;
-
-        // l, t, r, b
-        Rect rect = new Rect(point.x - widthBuffer, point.y + heightBuffer, point.x + widthBuffer, point.y - heightBuffer);
-
-        mapView.invalidateMapCoordinates(rect);
-*/
-
-        mapView.invalidate();
-
+        if (marker != null) {
+            marker.setBounds(0, 0, marker.getIntrinsicWidth(), marker.getIntrinsicHeight());
+        }
+        invalidate();
     }
 
-    public void setMarkerHotspot(final HotspotPlace place) {
-        this.mHotspotPlace = (place == null) ? HotspotPlace.BOTTOM_CENTER : place;
+    public void setHotspot(HotspotPlace place) {
+        if (place == null) {
+            place = HotspotPlace.BOTTOM_CENTER; //use same default than in osmdroid.
+        }
+        switch (place) {
+            case NONE:
+            case UPPER_LEFT_CORNER:
+                mAnchor.set(0, 0);
+                break;
+            case BOTTOM_CENTER:
+                mAnchor.set(0.5f, 1f);
+                break;
+            case LOWER_LEFT_CORNER:
+                mAnchor.set(0, 1);
+                break;
+            case LOWER_RIGHT_CORNER:
+                mAnchor.set(1, 1);
+                break;
+            case CENTER:
+                mAnchor.set(0.5f, 0.5f);
+                break;
+            case LEFT_CENTER:
+                mAnchor.set(0, 0.5f);
+                break;
+            case RIGHT_CENTER:
+                mAnchor.set(1, 0.5f);
+                break;
+            case TOP_CENTER:
+                mAnchor.set(0.5f, 0);
+                break;
+            case UPPER_RIGHT_CORNER:
+                mAnchor.set(1, 0);
+                break;
+        }
+        invalidate();
     }
 
-    public HotspotPlace getMarkerHotspot() {
-        return this.mHotspotPlace;
+    public Point getAnchor() {
+        if (mAnchor != null) {
+            int markerWidth = getWidth(), markerHeight = getHeight();
+            return new Point((int) (-mAnchor.x * markerWidth), (int) (-mAnchor.y * markerHeight));
+        }
+        return new Point(0, 0);
     }
 
-    // ===========================================================
-    // Methods from SuperClass/Interfaces
-    // ===========================================================
+    public Point getAnchor(HotspotPlace place) {
+        int markerWidth = getWidth(), markerHeight = getHeight();
+        return getHotspot(place, markerWidth, markerHeight);
+    }
 
-    // ===========================================================
-    // Methods
-    // ===========================================================
+    public void setAnchor(final PointF anchor) {
+        this.mAnchor = anchor;
+        invalidate();
+    }
+
     public static void setState(final Drawable drawable, final int stateBitset) {
         final int[] states = new int[3];
         int index = 0;
@@ -261,61 +275,104 @@ public class Marker {
         return this.mMarker;
     }
 
+    /**
+     * Get the width of the marker, based on the width of the image backing it.
+     */
     public int getWidth() {
         return this.mMarker.getIntrinsicWidth();
     }
 
     public int getHeight() {
-        return this.mMarker.getIntrinsicHeight();
+        return this.mMarker.getIntrinsicHeight() / 2;
     }
 
-    // ===========================================================
-    // Inner and Anonymous Classes
-    // ===========================================================
+    /**
+     * Get the current position of the marker in pixels
+     */
+    public PointF getPositionOnScreen(final Projection projection, final PointF reuse) {
+        return projection.toPixels(mCurMapCoords, reuse);
+    }
 
+    public PointF getDrawingPositionOnScreen(final Projection projection, PointF reuse) {
+        reuse = getPositionOnScreen(projection, reuse);
+        Point point = getAnchor();
+        reuse.offset(point.x, point.y);
+        return reuse;
+    }
+
+    protected RectF getDrawingBounds(final Projection projection, RectF reuse) {
+        if (reuse == null) {
+            reuse = new RectF();
+        }
+        final PointF position = getPositionOnScreen(projection, null);
+        final int w = getWidth();
+        final int h = getHeight();
+        final float x = position.x - mAnchor.x * w;
+        final float y = position.y - mAnchor.y * h;
+        reuse.set(x, y, x + w, y + h * 2);
+        return reuse;
+    }
+
+    protected RectF getMapDrawingBounds(final Projection projection, RectF reuse) {
+        if (reuse == null) {
+            reuse = new RectF();
+        }
+        projection.toMapPixels(mLatLng, mCurMapCoords);
+        final int w = getWidth();
+        final int h = getHeight();
+        final float x = mCurMapCoords.x - mAnchor.x * w;
+        final float y = mCurMapCoords.y - mAnchor.y * h;
+        reuse.set(x, y, x + w, y + h * 2);
+        return reuse;
+    }
+
+    public PointF getHotspotScale(HotspotPlace place, PointF reuse) {
+        if (reuse == null) {
+            reuse = new PointF();
+        }
+        if (place == null) {
+            place = HotspotPlace.BOTTOM_CENTER; //use same default than in osmdroid.
+        }
+        switch (place) {
+            case NONE:
+            case UPPER_LEFT_CORNER:
+                reuse.set(0, 0);
+                break;
+            case BOTTOM_CENTER:
+                reuse.set(0.5f, 1f);
+                break;
+            case LOWER_LEFT_CORNER:
+                reuse.set(0, 1);
+                break;
+            case LOWER_RIGHT_CORNER:
+                reuse.set(1, 1);
+                break;
+            case CENTER:
+                reuse.set(0.5f, 0.5f);
+                break;
+            case LEFT_CENTER:
+                reuse.set(0, 0.5f);
+                break;
+            case RIGHT_CENTER:
+                reuse.set(1, 0.5f);
+                break;
+            case TOP_CENTER:
+                reuse.set(0.5f, 0);
+                break;
+            case UPPER_RIGHT_CORNER:
+                reuse.set(1, 0);
+                break;
+        }
+        return reuse;
+    }
 
     /**
      * From a HotspotPlace and drawable dimensions (width, height), return the hotspot position.
      * Could be a public method of HotspotPlace or OverlayItem...
      */
     public Point getHotspot(HotspotPlace place, int w, int h) {
-        Point hp = new Point();
-        if (place == null) {
-            place = HotspotPlace.BOTTOM_CENTER; //use same default than in osmdroid.
-        }
-        switch (place) {
-            case NONE:
-                hp.set(0, 0);
-                break;
-            case BOTTOM_CENTER:
-                hp.set(w / 2, 0);
-                break;
-            case LOWER_LEFT_CORNER:
-                hp.set(0, 0);
-                break;
-            case LOWER_RIGHT_CORNER:
-                hp.set(w, 0);
-                break;
-            case CENTER:
-                hp.set(w / 2, -h / 2);
-                break;
-            case LEFT_CENTER:
-                hp.set(0, -h / 2);
-                break;
-            case RIGHT_CENTER:
-                hp.set(w, -h / 2);
-                break;
-            case TOP_CENTER:
-                hp.set(w / 2, -h);
-                break;
-            case UPPER_LEFT_CORNER:
-                hp.set(0, -h);
-                break;
-            case UPPER_RIGHT_CORNER:
-                hp.set(w, -h);
-                break;
-        }
-        return hp;
+        PointF scale = getHotspotScale(place, null);
+        return new Point((int) (-w * scale.x), (int) (-h * scale.y));
     }
 
     /**
@@ -326,16 +383,10 @@ public class Marker {
      */
     public void showBubble(InfoWindow tooltip, MapView aMapView, boolean panIntoView) {
         //offset the tooltip to be top-centered on the marker:
-        Drawable marker = getMarker(0 /*OverlayItem.ITEM_STATE_FOCUSED_MASK*/);
-        int markerWidth = 0, markerHeight = 0;
-        if (marker != null) {
-            markerWidth = marker.getIntrinsicWidth();
-            markerHeight = marker.getIntrinsicHeight();
-        } //else... we don't have the default marker size => don't user default markers!!!
-        Point markerH = getHotspot(getMarkerHotspot(), markerWidth, markerHeight);
-        Point tooltipH = getHotspot(HotspotPlace.TOP_CENTER, markerWidth, markerHeight);
-        tooltipH.offset(-markerH.x, -markerH.y);
-        tooltip.open(this, this.getPoint(), tooltipH.x, tooltipH.y);
+        Point markerH = getAnchor();
+        Point tooltipH = getAnchor(HotspotPlace.TOP_CENTER);
+        markerH.offset(-tooltipH.x, tooltipH.y);
+        tooltip.open(this, this.getPoint(), markerH.x, markerH.y);
         if (panIntoView) {
             aMapView.getController().animateTo(getPoint());
         }
@@ -344,27 +395,42 @@ public class Marker {
         tooltip.setBoundMarker(this);
     }
 
-    private Context context;
-    private Tooltip tooltip;
-    private MapView mapView;
-    private LatLng latLng;
-    private Icon icon;
-
-
-    public Marker addTo(MapView mv) {
-        mapView = mv;
-        context = mv.getContext();
-        if (icon == null) {
-            // Set default icon
-            setIcon(new Icon(mv.getResources(), Icon.Size.LARGE, "", "000"));
-        }
+    /**
+     * Sets the Icon image that represents this marker on screen.
+     */
+    public Marker setIcon(Icon aIcon) {
+        this.icon = aIcon;
+        icon.setMarker(this);
         return this;
     }
 
-    public Marker setIcon(Icon aIcon) {
-        this.icon = aIcon;
-        this.icon.setMarker(this);
-        this.setMarkerHotspot(HotspotPlace.CENTER);
-        return this;
+    public PointF getPositionOnMap() {
+        return mCurMapCoords;
+    }
+
+    public void updateDrawingPosition() {
+        getMapDrawingBounds(mapView.getProjection(), mMyLocationRect);
+    }
+
+    /**
+     * Sets the marker to be redrawn.
+     */
+    public void invalidate() {
+        if (mapView == null) {
+            return; //not on map yet
+        }
+        // Get new drawing bounds
+        mMyLocationPreviousRect.set(mMyLocationRect);
+        updateDrawingPosition();
+        final RectF newRect = new RectF(mMyLocationRect);
+        // If we had a previous location, merge in those bounds too
+        newRect.union(mMyLocationPreviousRect);
+        // Invalidate the bounds
+        mapView.post(new Runnable() {
+            @Override
+            public void run() {
+                mapView.invalidateMapCoordinates(newRect);
+            }
+        });
     }
 }

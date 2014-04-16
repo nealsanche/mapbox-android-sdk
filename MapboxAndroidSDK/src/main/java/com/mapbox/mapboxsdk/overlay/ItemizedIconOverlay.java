@@ -2,42 +2,26 @@ package com.mapbox.mapboxsdk.overlay;
 
 import android.content.Context;
 import android.graphics.Point;
-import android.graphics.PointF;
-import android.graphics.drawable.Drawable;
-import android.view.Display;
-import com.mapbox.mapboxsdk.R;
+import android.util.DisplayMetrics;
 import android.view.MotionEvent;
 import android.view.WindowManager;
-import com.mapbox.mapboxsdk.geometry.BoundingBox;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.views.MapView;
-import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas;
 import com.mapbox.mapboxsdk.views.util.Projection;
-
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 
-public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<Item> {
+public class ItemizedIconOverlay extends ItemizedOverlay {
 
-    protected final List<Item> mItemList;
-    protected OnItemGestureListener<Item> mOnItemGestureListener;
+    protected final List<Marker> mItemList;
+    protected OnItemGestureListener<Marker> mOnItemGestureListener;
     private int mDrawnItemsLimit = Integer.MAX_VALUE;
-    private final Point mTouchScreenPoint = new Point();
-    private final PointF mItemPoint = new PointF();
-    private ItemizedIconOverlay<ClusterItem> clusters;
     private MapView view;
     private Context context;
-    private boolean isClusterOverlay;
-    private ClusterActions clusterActions;
-    private boolean clusteringOn = true;
 
-    public ItemizedIconOverlay(
-            final Context pContext,
-            final List<Item> pList,
-            final com.mapbox.mapboxsdk.overlay.ItemizedIconOverlay.OnItemGestureListener<Item> pOnItemGestureListener) {
-        super(pContext.getResources().getDrawable(R.drawable.marker_default));
-
+    public ItemizedIconOverlay(final Context pContext, final List<Marker> pList,
+            final com.mapbox.mapboxsdk.overlay.ItemizedIconOverlay.OnItemGestureListener<Marker> pOnItemGestureListener) {
+        super();
         this.context = pContext;
         this.mItemList = pList;
         this.mOnItemGestureListener = pOnItemGestureListener;
@@ -45,13 +29,14 @@ public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<It
     }
 
     @Override
-    public boolean onSnapToItem(final int pX, final int pY, final Point pSnapPoint, final MapView pMapView) {
+    public boolean onSnapToItem(final int pX, final int pY, final Point pSnapPoint,
+            final MapView pMapView) {
         // TODO Implement this!
         return false;
     }
 
     @Override
-    protected Item createItem(final int index) {
+    protected Marker createItem(final int index) {
         return mItemList.get(index);
     }
 
@@ -60,18 +45,48 @@ public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<It
         return Math.min(mItemList.size(), mDrawnItemsLimit);
     }
 
-    public boolean addItem(final Item item) {
+    public boolean addItem(final Marker item) {
+        item.setParentHolder(this);
         final boolean result = mItemList.add(item);
         populate();
         return result;
     }
 
-    public void addItem(final int location, final Item item) {
+    public void addItem(final int location, final Marker item) {
+        item.setParentHolder(this);
         mItemList.add(location, item);
         populate();
     }
 
-    public boolean addItems(final List<Item> items) {
+    /**
+     * When a content sensitive action is performed the content item needs to be identified. This
+     * method does that and then performs the assigned task on that item.
+     *
+     * @return true if event is handled false otherwise
+     */
+    private boolean activateSelectedItems(final MotionEvent event, final MapView mapView,
+            final ActiveItem task) {
+        final Projection projection = mapView.getProjection();
+        final float x = event.getX();
+        final float y = event.getY();
+        for (int i = 0; i < this.mItemList.size(); ++i) {
+            final Marker item = getItem(i);
+            if (markerHitTest(item, projection, x, y)) {
+                if (task.run(i)) {
+                    this.setFocus(item);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean addItems(final List items) {
+        for (Object item : items) {
+            if (item instanceof Marker) {
+                ((Marker) item).setParentHolder(this);
+            }
+        }
         final boolean result = mItemList.addAll(items);
         populate();
         return result;
@@ -82,22 +97,43 @@ public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<It
     }
 
     public void removeAllItems(final boolean withPopulate) {
+        for (Marker item : mItemList) {
+            item.setParentHolder(null);
+        }
         mItemList.clear();
         if (withPopulate) {
             populate();
         }
     }
 
-    public boolean removeItem(final Item item) {
+    public boolean removeItem(final Marker item) {
         final boolean result = mItemList.remove(item);
+        if (result) {
+            item.setParentHolder(null);
+        }
         populate();
         return result;
     }
 
-    public Item removeItem(final int position) {
-        final Item result = mItemList.remove(position);
+    public Marker removeItem(final int position) {
+        final Marker item = mItemList.remove(position);
+        if (item != null) {
+            item.setParentHolder(null);
+        }
         populate();
-        return result;
+        return item;
+    }
+
+    public void removeItems(final List items) {
+        for (Object item : items) {
+            if (item instanceof Marker) {
+                final boolean result = mItemList.remove(item);
+                if (result) {
+                    ((Marker) item).setParentHolder(null);
+                }
+            }
+        }
+        populate();
     }
 
     /**
@@ -112,16 +148,17 @@ public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<It
         return (activateSelectedItems(event, mapView, new ActiveItem() {
             @Override
             public boolean run(final int index) {
-                final ItemizedIconOverlay<Item> that = ItemizedIconOverlay.this;
+                final ItemizedIconOverlay that = ItemizedIconOverlay.this;
                 if (that.mOnItemGestureListener == null) {
                     return false;
                 }
                 return onSingleTapUpHelper(index, that.mItemList.get(index), mapView);
             }
-        })) ? true : super.onSingleTapConfirmed(event, mapView);
+        }));
     }
 
-    protected boolean onSingleTapUpHelper(final int index, final Item item, final MapView mapView) {
+    protected boolean onSingleTapUpHelper(final int index, final Marker item,
+            final MapView mapView) {
         return this.mOnItemGestureListener.onItemSingleTapUp(index, item);
     }
 
@@ -130,212 +167,24 @@ public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<It
         return (activateSelectedItems(event, mapView, new ActiveItem() {
             @Override
             public boolean run(final int index) {
-                final ItemizedIconOverlay<Item> that = ItemizedIconOverlay.this;
+                final ItemizedIconOverlay that = ItemizedIconOverlay.this;
                 if (that.mOnItemGestureListener == null) {
                     return false;
                 }
                 return onLongPressHelper(index, getItem(index));
             }
-        })) ? true : super.onLongPress(event, mapView);
+        }));
     }
 
-    protected boolean onLongPressHelper(final int index, final Item item) {
+    protected boolean onLongPressHelper(final int index, final Marker item) {
         return this.mOnItemGestureListener.onItemLongPress(index, item);
     }
 
-    /**
-     * When a content sensitive action is performed the content item needs to be identified. This
-     * method does that and then performs the assigned task on that item.
-     *
-     * @param event
-     * @param mapView
-     * @param task
-     * @return true if event is handled false otherwise
-     */
-    private boolean activateSelectedItems(final MotionEvent event, final MapView mapView,
-                                          final ActiveItem task) {
-        final Projection pj = mapView.getProjection();
-        final int eventX = (int) event.getX();
-        final int eventY = (int) event.getY();
-
-		/* These objects are created to avoid construct new ones every cycle. */
-        pj.fromMapPixels(eventX, eventY, mTouchScreenPoint);
-
-        for (int i = 0; i < this.mItemList.size(); ++i) {
-            final Item item = getItem(i);
-            final Drawable marker = (item.getMarker(0) == null) ? this.mDefaultMarker : item
-                    .getMarker(0);
-
-            pj.toMapPixels(item.getPoint(), mItemPoint);
-
-            if (hitTest(item, marker, (int) (mTouchScreenPoint.x - mItemPoint.x), (int) (mTouchScreenPoint.y
-                    - mItemPoint.y))) {
-                if (task.run(i)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    public void setClusterActions(ClusterActions clusterActions) {
-        this.clusterActions = clusterActions;
-    }
-
-    public void cluster(MapView view, Context context) {
-        if (!isClusteringOn()) {
-            return;
-        }
-        this.view = view;
-        this.context = context;
-        int currentGroup = 0;
-        final double CLUSTERING_THRESHOLD = getThreshold();
-        clusterList = new ArrayList<ClusterItem>();
-        for (Marker item : this.mItemList) {
-            item.setClustered(false);
-            item.assignGroup(0);
-        }
-        currentGroup++;
-        for (Marker item : this.mItemList) {
-            if (item.getGroup() == 0) {
-                item.assignGroup(currentGroup);
-                item.setClustered(true);
-                int counter = 0;
-                for (Marker item2 : this.mItemList) {
-                    if (item2.getGroup() == 0 && PointF.length(screenX(item) - screenX(item2), screenY(item) - screenY(item2)) <= CLUSTERING_THRESHOLD) {
-                        item2.assignGroup(currentGroup);
-                        item2.setClustered(true);
-                        counter++;
-                    }
-                }
-                if (counter == 0) { // If the item has no markers near it there is no sense in clustering it
-                    item.setClustered(false);
-                    item.assignGroup(0);
-                }
-            }
-            currentGroup++;
-        }
-        getGroupSet();
-        view.getOverlays().remove(clusters);
-        if (clusters != null) {
-            clusters.removeAllItems();
-            initClusterOverlay();
-            clusters.addItems(clusterList);
-        } else {
-            initClusterOverlay();
-            clusters.addItems(clusterList);
-        }
-
-        view.getOverlays().add(clusters);
-        view.invalidate();
-
-    }
-
-
-    private ArrayList<ClusterItem> clusterList = new ArrayList<ClusterItem>();
-
-
     private double getThreshold() {
         WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-        Display display = wm.getDefaultDisplay();
-        Point size = new Point();
-        if (android.os.Build.VERSION.SDK_INT >= 13) {
-            display.getSize(size);
-            return size.x / 10;
-        } else {
-            return display.getWidth();
-        }
-    }
-
-    private HashSet<Integer> getGroupSet() {
-        HashSet<Integer> set = new HashSet<Integer>();
-        for (Marker element : mItemList) {
-            if (!set.contains(element.getGroup())) {
-                set.add(element.getGroup());
-                generateCenterByGroup((ArrayList<Marker>) mItemList, element.getGroup());
-            }
-        }
-        return set;
-    }
-
-    private LatLng getCenter(ArrayList<Marker> list) {
-        int total = list.size();
-
-        double X = 0;
-        double Y = 0;
-        double Z = 0;
-
-        for (Marker i : list) {
-            LatLng point = i.getPoint();
-            double lat = point.getLatitude() * Math.PI / 180;
-            double lon = point.getLongitude() * Math.PI / 180;
-
-            double x = Math.cos(lat) * Math.cos(lon);
-            double y = Math.cos(lat) * Math.sin(lon);
-            double z = Math.sin(lat);
-
-            X += x;
-            Y += y;
-            Z += z;
-        }
-
-        X = X / total;
-        Y = Y / total;
-        Z = Z / total;
-
-        double Lon = Math.atan2(Y, X);
-        double Hyp = Math.sqrt(X * X + Y * Y);
-        double Lat = Math.atan2(Z, Hyp);
-
-        return new LatLng(Lat * 180 / Math.PI, Lon * 180 / Math.PI);
-    }
-
-
-    private void initClusterOverlay() {
-
-        clusters = new ItemizedIconOverlay<ClusterItem>(context, clusterList, new ItemizedIconOverlay.OnItemGestureListener<ClusterItem>() {
-            @Override
-            public boolean onItemSingleTapUp(int index, ClusterItem item) {
-                if (clusterActions != null) {
-                    clusterActions.onClusterTap(item);
-                } else {
-                    ArrayList<LatLng> activePoints = getCoordinateList(getGroupElements((List<Marker>) mItemList, item.getGroup()));
-                    view.zoomToBoundingBox(BoundingBox.fromLatLngs(activePoints));
-                }
-                return false;
-            }
-
-            @Override
-            public boolean onItemLongPress(int index, ClusterItem item) {
-                return false;
-            }
-        });
-        clusters.setCluster(true);
-    }
-
-    private LatLng generateCenterByGroup(ArrayList<Marker> list, int group) {
-        int sumlon = 0, sumlat = 0, count = 0;
-        ArrayList<Marker> tempList = getGroupElements(list, group);
-        LatLng result = getCenter(tempList);
-        ClusterItem m = new ClusterItem(view, result);
-        m.setMarker(context.getResources().getDrawable(R.drawable.clusteri));
-        m.assignGroup(group);
-        m.setMarkerHotspot(Marker.HotspotPlace.CENTER);
-        m.setChildCount(tempList.size());
-        if (m.getChildCount() > 1) {
-            clusterList.add(m);
-        }
-        return result;
-    }
-
-    private ArrayList<Marker> getGroupElements(List<Marker> list, int group) {
-        ArrayList<Marker> tempList = new ArrayList<Marker>();
-        for (Marker element : list) {
-            if (element.getGroup() == group) {
-                tempList.add(element);
-            }
-        }
-        return tempList;
+        DisplayMetrics dm = new DisplayMetrics();
+        wm.getDefaultDisplay().getMetrics(dm);
+        return (double) dm.widthPixels;
     }
 
     private ArrayList<LatLng> getCoordinateList(List<Marker> list) {
@@ -346,7 +195,6 @@ public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<It
         return theList;
     }
 
-
     private float screenX(Marker item) {
         return view.getProjection().toMapPixels(item.getPoint(), null).x;
     }
@@ -354,10 +202,6 @@ public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<It
     private float screenY(Marker item) {
         return view.getProjection().toMapPixels(item.getPoint(), null).y;
     }
-
-    // ===========================================================
-    // Getter & Setter
-    // ===========================================================
 
     public int getDrawnItemsLimit() {
         return this.mDrawnItemsLimit;
@@ -367,33 +211,8 @@ public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<It
         this.mDrawnItemsLimit = aLimit;
     }
 
-    public boolean isClusterOverlay() {
-        return isClusterOverlay;
-    }
-
-    public void setCluster(boolean cluster) {
-        this.isClusterOverlay = cluster;
-    }
-
-    public boolean isClusteringOn() {
-        return clusteringOn;
-    }
-
-    public void setClusteringOn(boolean clusteringOn) {
-        this.clusteringOn = clusteringOn;
-    }
-
-    public ClusterActions getClusterActions() {
-        return clusterActions;
-    }
-
-    // ===========================================================
-    // Inner and Anonymous Classes
-    // ===========================================================
-
     /**
      * When the item is touched one of these methods may be invoked depending on the type of touch.
-     * <p/>
      * Each of them returns true if the event was completely handled.
      */
     public static interface OnItemGestureListener<T> {
@@ -404,11 +223,5 @@ public class ItemizedIconOverlay<Item extends Marker> extends ItemizedOverlay<It
 
     public static interface ActiveItem {
         public boolean run(final int aIndex);
-    }
-
-    public static interface ClusterActions {
-        public ISafeCanvas onClusterMarkerDraw(ClusterItem item, ISafeCanvas canvas);
-
-        public boolean onClusterTap(ClusterItem item);
     }
 }

@@ -7,4 +7,6 @@ public interface ILatLng {
     double getLatitude();
 
     double getLongitude();
+
+    double getAltitude();
 }
