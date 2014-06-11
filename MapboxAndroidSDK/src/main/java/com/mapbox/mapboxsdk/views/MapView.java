@@ -1965,12 +1965,4 @@ public class MapView extends ViewGroup
     public PointF getDefaultPinAnchor() {
         return mDefaultPinAnchor;
     }
-
-    public void setMapListener(MapListener listener) {
-        mListener = listener;
-    }
-
-    public MapListener getMapListener() {
-        return mListener;
-    }
 }
