@@ -10,11 +10,13 @@ public class ScrollEvent implements MapEvent {
     protected MapView source;
     protected int x;
     protected int y;
+    protected boolean userAction;
 
-    public ScrollEvent(final MapView aSource, final int ax, final int ay) {
+    public ScrollEvent(final MapView aSource, final int ax, final int ay, final boolean userAction) {
         this.source = aSource;
         this.x = ax;
         this.y = ay;
+        this.userAction = userAction;
     }
 
     /**
@@ -36,6 +38,13 @@ public class ScrollEvent implements MapEvent {
      */
     public int getY() {
         return y;
+    }
+
+    /**
+     * @return true if it was a user action (touch action).
+     */
+    public boolean getUserAction() {
+        return userAction;
     }
 
     @Override

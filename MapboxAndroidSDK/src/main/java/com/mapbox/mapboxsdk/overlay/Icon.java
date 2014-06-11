@@ -1,16 +1,16 @@
 package com.mapbox.mapboxsdk.overlay;
 
 import android.content.Context;
-import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
 import com.mapbox.mapboxsdk.constants.MapboxConstants;
 import com.mapbox.mapboxsdk.util.BitmapUtils;
-import com.squareup.okhttp.OkHttpClient;
+import com.mapbox.mapboxsdk.util.NetworkUtils;
+import com.mapbox.mapboxsdk.util.constants.UtilConstants;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -25,7 +25,7 @@ import uk.co.senab.bitmapcache.CacheableBitmapDrawable;
 public class Icon implements MapboxConstants {
 
     private Marker marker;
-    private BitmapDrawable drawable;
+    private Drawable drawable;
 
     protected static BitmapLruCache sIconCache;
     private static final String DISK_CACHE_SUBDIR = "mapbox_icon_cache";
@@ -60,7 +60,9 @@ public class Icon implements MapboxConstants {
             File cacheDir = getDiskCacheDir(context, DISK_CACHE_SUBDIR);
             if (!cacheDir.exists()) {
                 if (cacheDir.mkdirs()) {
-                    Log.d(TAG, "creating cacheDir " + cacheDir);
+                    if (UtilConstants.DEBUGMODE) {
+                        Log.d(TAG, "creating cacheDir " + cacheDir);
+                    }
                 } else {
                     Log.e(TAG, "can't create cacheDir " + cacheDir);
                 }
@@ -94,9 +96,9 @@ public class Icon implements MapboxConstants {
      * download process to load it from the API.
      *
      * @param context Android context - Used for proper Bitmap Density generation
-     * @param size Size of Icon
-     * @param symbol Maki Symbol
-     * @param aColor Color of Icon
+     * @param size    Size of Icon
+     * @param symbol  Maki Symbol
+     * @param aColor  Color of Icon
      */
     public Icon(Context context, Size size, String symbol, String aColor) {
         String url = MAPBOX_BASE_URL + "marker/pin-" + size.getApiString();
@@ -106,6 +108,14 @@ public class Icon implements MapboxConstants {
             url += "+" + aColor.replace("#", "") + "@2x.png";
         }
         downloadBitmap(context, url);
+    }
+
+    /**
+     * Initialize an Icon with a custom Drawable
+     * @param drawable Custom Drawable
+     */
+    public Icon(Drawable drawable) {
+        this.drawable = drawable;
     }
 
     /**
@@ -196,20 +206,13 @@ public class Icon implements MapboxConstants {
             this.url = src[0];
             CacheableBitmapDrawable result = getCache().getFromDiskCache(this.url, null);
             if (result == null) {
-                OkHttpClient client = new OkHttpClient();
-                InputStream in = null;
                 try {
-                    try {
+                    if (UtilConstants.DEBUGMODE) {
                         Log.d(TAG, "Maki url to load = '" + this.url + "'");
-                        HttpURLConnection connection = client.open(new URL(this.url));
-                        connection.setRequestProperty("User-Agent", MapboxConstants.USER_AGENT);
-                        // Note, sIconCache cannot be null..
-                        result = sIconCache.put(this.url, connection.getInputStream());
-                    } finally {
-                        if (in != null) {
-                            in.close();
-                        }
                     }
+                    HttpURLConnection connection = NetworkUtils.getHttpURLConnection(new URL(url));
+                    // Note, sIconCache cannot be null..
+                    result = sIconCache.put(this.url, connection.getInputStream());
                 } catch (IOException e) {
                     Log.e(TAG, "doInBackground: Unable to fetch icon from: " + this.url);
                 }
@@ -227,7 +230,9 @@ public class Icon implements MapboxConstants {
                             icon.marker.setMarker(bitmap);
                         }
                     }
-                    Log.w(TAG, "Loaded:" + this.url);
+                    if (UtilConstants.DEBUGMODE) {
+                        Log.d(TAG, "Loaded:" + this.url);
+                    }
                     Icon.downloadQueue.remove(this.url);
                 }
             }

@@ -45,7 +45,7 @@ public abstract class MapTileLayerBase implements IMapTileProviderCallback, Tile
      *
      * @see CacheableBitmapDrawable
      */
-    public abstract Drawable getMapTile(MapTile pTile);
+    public abstract Drawable getMapTile(MapTile pTile, boolean allowRemote);
 
     public abstract void detach();
 
@@ -273,6 +273,10 @@ public abstract class MapTileLayerBase implements IMapTileProviderCallback, Tile
         mTileCache.purgeDiskCache();
     }
 
+    public void setDiskCacheEnabled(final boolean enabled) {
+        mTileCache.setDiskCacheEnabled(enabled);
+    }
+
     /**
      * Whether to use the network connection if it's available.
      */
@@ -308,6 +312,10 @@ public abstract class MapTileLayerBase implements IMapTileProviderCallback, Tile
         return (mTileCache != null) ? mTileCache.getBitmapFromRemoved(width, height) : null;
     }
 
+    /**
+     * If a given MapTile is present in this cache, remove it from memory.
+     * @param aTile
+     */
     public void removeTileFromMemory(final MapTile aTile) {
         if (mTileCache != null) {
             mTileCache.removeTileFromMemory(aTile);

@@ -2,22 +2,25 @@ package com.mapbox.mapboxsdk.tileprovider.tilesource;
 
 import android.os.AsyncTask;
 import android.util.Log;
-import com.mapbox.mapboxsdk.constants.MapboxConstants;
+
 import com.mapbox.mapboxsdk.geometry.BoundingBox;
 import com.mapbox.mapboxsdk.geometry.LatLng;
-import com.squareup.okhttp.HttpResponseCache;
-import com.squareup.okhttp.OkHttpClient;
+import com.mapbox.mapboxsdk.util.NetworkUtils;
+import com.mapbox.mapboxsdk.util.constants.UtilConstants;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
+import java.net.ResponseCache;
 import java.net.URL;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 /**
  * A type of tile layer that loads tiles from the internet and metadata about itself
@@ -26,18 +29,15 @@ import org.json.JSONObject;
 public class TileJsonTileLayer extends WebSourceTileLayer {
 
     private JSONObject tileJSON;
-    HttpResponseCache cache;
-    OkHttpClient client;
+    private ResponseCache cache;
 
     public TileJsonTileLayer(final String pId, final String url, final boolean enableSSL) {
         super(pId, url, enableSSL);
 
-        client = new OkHttpClient();
         File cacheDir =
                 new File(System.getProperty("java.io.tmpdir"), UUID.randomUUID().toString());
         try {
-            cache = new HttpResponseCache(cacheDir, 1024);
-            client.setResponseCache(cache);
+            cache = NetworkUtils.getResponseCache(cacheDir, 1024);
         } catch (Exception e) {
             Log.e(TAG, "Cache creation failed.", e);
         }
@@ -76,7 +76,9 @@ public class TileJsonTileLayer extends WebSourceTileLayer {
                 mBoundingBox = new BoundingBox(bounds[3], bounds[2], bounds[1], bounds[0]);
             }
         }
-        Log.d(TAG, "TileJSON " + this.tileJSON.toString());
+        if (UtilConstants.DEBUGMODE) {
+            Log.d(TAG, "TileJSON " + this.tileJSON.toString());
+        }
     }
 
     public JSONObject getTileJSON() {
@@ -157,11 +159,10 @@ public class TileJsonTileLayer extends WebSourceTileLayer {
 
     class RetrieveJSONTask extends AsyncTask<String, Void, JSONObject> {
         protected JSONObject doInBackground(String... urls) {
-            InputStream in;
+            InputStream in = null;
             try {
                 URL url = new URL(urls[0]);
-                HttpURLConnection connection = client.open(url);
-                connection.setRequestProperty("User-Agent", MapboxConstants.USER_AGENT);
+                HttpURLConnection connection = NetworkUtils.getHttpURLConnection(url, cache);
                 in = connection.getInputStream();
                 byte[] response = readFully(in);
                 String result = new String(response, "UTF-8");
@@ -169,6 +170,14 @@ public class TileJsonTileLayer extends WebSourceTileLayer {
             } catch (Exception e) {
                 e.printStackTrace();
                 return null;
+            } finally {
+                try {
+                    if (in != null) {
+                        in.close();
+                    }
+                } catch (IOException e) {
+                    Log.e(TAG, "Error closing InputStream: " + e.toString());
+                }
             }
         }
     }

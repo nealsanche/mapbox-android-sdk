@@ -8,11 +8,13 @@ import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
+
 import com.mapbox.mapboxsdk.views.MapView;
 import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas;
 import com.mapbox.mapboxsdk.views.safecanvas.ISafeCanvas.UnsafeCanvasHandler;
 import com.mapbox.mapboxsdk.views.safecanvas.SafePaint;
 import com.mapbox.mapboxsdk.views.util.Projection;
+
 import java.util.ArrayList;
 
 /**
@@ -122,13 +124,15 @@ public abstract class ItemizedOverlay extends SafeDrawOverlay implements Overlay
      * through the createItem(int) method. The subclass should call this as soon as it has data,
      * before anything else gets called.
      */
-    protected final void populate() {
+    protected void populate() {
+
         final int size = size();
         mInternalItemList.clear();
         mInternalItemList.ensureCapacity(size);
         for (int a = 0; a < size; a++) {
             mInternalItemList.add(createItem(a));
         }
+
     }
 
     /**

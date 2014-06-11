@@ -26,7 +26,7 @@ public class MBTilesFileArchive implements IArchiveFile {
     public static final String COL_TILES_TILE_DATA = "tile_data";
     public static final String COL_VALUE = "value";
 
-    private MBTilesFileArchive(final SQLiteDatabase pDatabase) {
+    public MBTilesFileArchive(final SQLiteDatabase pDatabase) {
         mDatabase = pDatabase;
     }
 
@@ -61,7 +61,7 @@ public class MBTilesFileArchive implements IArchiveFile {
                 return ret;
             }
         } catch (final Throwable e) {
-            Log.w(TAG, "Error getting db stream: " + pTile, e);
+            Log.e(TAG, "Error getting db stream: " + pTile, e);
         }
 
         return null;

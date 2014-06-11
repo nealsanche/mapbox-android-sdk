@@ -72,11 +72,11 @@ public class OverlayManager extends AbstractList<Overlay> {
     }
 
     private Integer getOverlayClassSortIndex(Overlay overlay) {
-        int result = 2;
+        int result = 3;
         if (overlay instanceof MapEventsOverlay) {
             result = 0;
         } else if (overlay instanceof UserLocationOverlay) {
-            result = 3;
+            result = 2;
         } else if (overlay instanceof PathOverlay) {
             result = 1;
         }
@@ -160,7 +160,7 @@ public class OverlayManager extends AbstractList<Overlay> {
         };
     }
 
-    public void onDraw(final Canvas c, final MapView pMapView) {
+    public void draw(final Canvas c, final MapView pMapView) {
         if (mTilesOverlay != null && mTilesOverlay.isEnabled()) {
             mTilesOverlay.draw(c, pMapView, true);
         }

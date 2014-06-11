@@ -38,11 +38,7 @@ public class MapViewScaleGestureDetectorListener
         currentScale = 1.0f;
         if (!this.mapView.isAnimating()) {
             this.mapView.mIsAnimating.set(true);
-            this.mapView.getController()
-                    .aboutToStartAnimation(
-                            lastFocusX + this.mapView.getScrollX() - (this.mapView.getWidth() / 2),
-                            lastFocusY + this.mapView.getScrollY() - (this.mapView.getHeight()
-                                    / 2));
+            this.mapView.getController().aboutToStartAnimation(lastFocusX, lastFocusY);
             scaling = true;
         }
         return true;
@@ -58,9 +54,11 @@ public class MapViewScaleGestureDetectorListener
         float focusX = detector.getFocusX();
         float focusY = detector.getFocusY();
 
-        this.mapView.getController()
-                .panBy((int) (lastFocusX - focusX), (int) (lastFocusY - focusY));
         this.mapView.setScale(currentScale);
+        this.mapView.getController()
+                .offsetDeltaScroll(lastFocusX - focusX, lastFocusY - focusY);
+        this.mapView.getController()
+                .panBy(lastFocusX - focusX, lastFocusY - focusY, true);
 
         lastFocusX = focusX;
         lastFocusY = focusY;
@@ -68,7 +66,7 @@ public class MapViewScaleGestureDetectorListener
     }
 
     @Override
-    public void onScaleEnd(ScaleGestureDetector scaleGestureDetector) {
+    public void onScaleEnd(ScaleGestureDetector detector) {
         if (!scaling) {
             return;
         }
@@ -79,5 +77,5 @@ public class MapViewScaleGestureDetectorListener
         scaling = false;
     }
 
-    private static String TAG = "detector";
+    private static String TAG = "Mapbox scaleDetector";
 }
